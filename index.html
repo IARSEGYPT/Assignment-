@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Assessment Desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Condensed:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+  :root{
+    --paper:#EEF0EE; --panel:#FFFFFF; --ink:#161E2B; --ink-soft:#4B5768;
+    --rail-blue:#2C5470; --rail-blue-dark:#1B3A50;
+    --signal-green:#2E6B4F; --signal-green-glow:#E4F0E9;
+    --signal-red:#A83C3C; --signal-red-glow:#F6E4E2;
+    --signal-amber:#B9762A; --signal-amber-glow:#F7ECDD;
+    --hairline:#D7DAD3; --board-bg:#12181F; --board-fg:#EDEADB;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:"IBM Plex Sans",system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
+  .app{max-width:1180px;margin:0 auto;padding:28px 24px 80px;}
+
+  .headerbar{background:var(--rail-blue-dark);color:#F1EFE6;border-radius:10px;padding:20px 24px;display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap;margin-bottom:22px;}
+  .headerbar .eyebrow{font-family:"IBM Plex Sans Condensed";letter-spacing:.14em;text-transform:uppercase;font-size:11px;color:#9FB4C4;margin:0 0 4px;}
+  .headerbar h1{margin:0;font-size:22px;font-weight:700;letter-spacing:.01em;}
+  .headerbar .meta{font-family:"Space Mono",monospace;font-size:12px;color:#C9D6DD;text-align:right;line-height:1.6;}
+  .lamp-legend{display:flex;gap:14px;font-family:"Space Mono",monospace;font-size:11px;color:#D6DEE2;}
+  .lamp-legend span{display:flex;align-items:center;gap:6px;}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block;}
+  .dot.green{background:#4CA57C;box-shadow:0 0 6px #4CA57C99;}
+  .dot.red{background:#D0605E;box-shadow:0 0 6px #D0605E99;}
+
+  .layout{display:grid;grid-template-columns:280px 1fr;gap:20px;align-items:start;}
+  @media (max-width:860px){.layout{grid-template-columns:1fr;}}
+
+  .panel{background:var(--panel);border:1px solid var(--hairline);border-radius:10px;padding:18px;}
+  .panel h2{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:var(--ink-soft);margin:0 0 12px;font-family:"IBM Plex Sans Condensed";font-weight:600;}
+  .panel + .panel{margin-top:18px;}
+
+  select{width:100%;border:1px solid var(--hairline);border-radius:7px;padding:9px 10px;font-family:"IBM Plex Sans";font-size:13.5px;background:#FCFCFB;}
+
+  .roster-item{display:flex;align-items:center;gap:8px;padding:9px 8px;border-radius:6px;cursor:pointer;font-size:13.5px;border:1px solid transparent;}
+  .roster-item:hover{background:#F4F5F2;}
+  .roster-item.active{background:var(--signal-green-glow);border-color:#BFDBCB;}
+  .roster-item .rname{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .roster-item .rlamp{width:8px;height:8px;border-radius:50%;flex:none;}
+
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;background:var(--rail-blue);color:#fff;border:none;border-radius:7px;padding:9px 14px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:"IBM Plex Sans";}
+  .btn:hover{background:var(--rail-blue-dark);}
+  .btn.secondary{background:#fff;color:var(--rail-blue);border:1px solid var(--rail-blue);}
+  .btn.secondary:hover{background:#EAF1F5;}
+  .btn.danger{background:#fff;color:var(--signal-red);border:1px solid #E2B7B4;}
+  .btn.danger:hover{background:var(--signal-red-glow);}
+  .btn.small{padding:5px 10px;font-size:12px;}
+  .btn:disabled{opacity:.5;cursor:not-allowed;}
+  .btn-block{width:100%;margin-top:10px;}
+
+  label{font-size:12.5px;font-weight:600;color:var(--ink-soft);display:block;margin:14px 0 5px;}
+  label:first-child{margin-top:0;}
+  input[type=text], textarea{width:100%;border:1px solid var(--hairline);border-radius:7px;padding:9px 10px;font-family:"IBM Plex Sans";font-size:14px;color:var(--ink);background:#FCFCFB;}
+  textarea{resize:vertical;min-height:110px;line-height:1.5;}
+  input:focus, textarea:focus, select:focus{outline:2px solid var(--rail-blue);outline-offset:1px;}
+  .filedrop{border:1.5px dashed var(--hairline);border-radius:7px;padding:10px;text-align:center;font-size:12px;color:var(--ink-soft);cursor:pointer;background:#FCFCFB;margin-top:6px;}
+  .filedrop:hover{border-color:var(--rail-blue);}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .hint{font-size:11.5px;color:var(--ink-soft);margin-top:4px;}
+
+  .board{background:var(--board-bg);color:var(--board-fg);border-radius:10px;padding:16px 6px;margin:18px 0;overflow-x:auto;}
+  .board-title{font-family:"Space Mono",monospace;font-size:11px;letter-spacing:.14em;color:#8FA6A0;text-transform:uppercase;padding:0 14px 10px;}
+  .board-row{display:grid;grid-template-columns:64px 1fr 140px;gap:10px;align-items:center;padding:8px 14px;border-top:1px solid #26313C;font-family:"Space Mono",monospace;cursor:pointer;}
+  .board-row:hover{background:#1A222C;}
+  .board-row .code{font-weight:700;font-size:13.5px;}
+  .board-row .title{font-size:12.5px;color:#C9CBB8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:"IBM Plex Sans";}
+  .board-row .verdict{display:flex;align-items:center;gap:8px;justify-content:flex-end;font-size:11.5px;letter-spacing:.04em;}
+  .lampbig{width:11px;height:11px;border-radius:50%;flex:none;}
+  .lampbig.green{background:#4CA57C;box-shadow:0 0 8px #4CA57Caa;}
+  .lampbig.red{background:#D0605E;box-shadow:0 0 8px #D0605Eaa;}
+  .lampbig.grey{background:#4B5563;box-shadow:none;}
+
+  .ac-detail{background:var(--panel);border:1px solid var(--hairline);border-left:4px solid var(--rail-blue);border-radius:0 8px 8px 0;padding:14px 16px;margin:0 0 10px;}
+  .ac-detail h3{margin:0 0 6px;font-size:14.5px;}
+  .verdict-pill{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.05em;padding:2px 9px;border-radius:20px;margin-bottom:8px;text-transform:uppercase;}
+  .verdict-pill.green{background:var(--signal-green-glow);color:var(--signal-green);}
+  .verdict-pill.red{background:var(--signal-red-glow);color:var(--signal-red);}
+  .ac-detail p{margin:6px 0;font-size:13.5px;line-height:1.55;color:var(--ink);}
+  .ac-detail .label{font-weight:600;color:var(--ink-soft);font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;}
+
+  .stat-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:16px 0;}
+  .stat{background:var(--panel);border:1px solid var(--hairline);border-radius:8px;padding:12px 14px;}
+  .stat .num{font-family:"Space Mono",monospace;font-size:22px;font-weight:700;}
+  .stat .lbl{font-size:11px;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.06em;margin-top:2px;}
+  @media (max-width:760px){.stat-strip{grid-template-columns:1fr 1fr;}}
+
+  .disclaimer{background:var(--signal-amber-glow);border:1px solid #E7C596;color:#6B4B1B;border-radius:7px;padding:10px 12px;font-size:12px;line-height:1.5;margin-top:12px;}
+  .resubmit-banner{background:var(--signal-red-glow);border:1px solid #E2B7B4;color:#7A2E2E;border-radius:8px;padding:12px 14px;margin:16px 0;font-size:13.5px;line-height:1.6;}
+  .resubmit-banner strong{display:block;margin-bottom:4px;font-size:13px;text-transform:uppercase;letter-spacing:.04em;}
+  .achieved-banner{background:var(--signal-green-glow);border:1px solid #BFDBCB;color:#1E4A34;border-radius:8px;padding:12px 14px;margin:16px 0;font-size:13.5px;}
+
+  .flag-list{margin:8px 0 0;padding-left:18px;font-size:13px;color:var(--ink);}
+  .flag-list li{margin-bottom:3px;}
+  .spinner{width:14px;height:14px;border:2px solid #ffffff66;border-top-color:#fff;border-radius:50%;display:inline-block;animation:spin .7s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .loading-line{font-size:12.5px;color:var(--ink-soft);margin-top:8px;font-family:"Space Mono",monospace;}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;}
+  .footer-note{font-size:11.5px;color:var(--ink-soft);margin-top:26px;text-align:center;line-height:1.6;}
+
+  .attempt-history{margin-top:18px;}
+  .attempt-row{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border:1px solid var(--hairline);border-radius:7px;margin-bottom:8px;font-size:13px;cursor:pointer;background:#fff;}
+  .attempt-row:hover{background:#F7F7F5;}
+  .attempt-row .apill{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;text-transform:uppercase;}
+  .attempt-row .apill.green{background:var(--signal-green-glow);color:var(--signal-green);}
+  .attempt-row .apill.red{background:var(--signal-red-glow);color:var(--signal-red);}
+
+  .modal{display:none;position:fixed;inset:0;background:#161E2Bcc;z-index:50;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto;}
+  .modal .sheet{background:#fff;max-width:760px;width:100%;border-radius:10px;padding:28px 30px;font-size:13.5px;line-height:1.6;}
+  .modal pre{white-space:pre-wrap;font-family:"IBM Plex Sans";font-size:13px;}
+  .modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+  .modal-head strong{font-size:15px;}
+
+  table.crit-table{width:100%;border-collapse:collapse;margin-top:8px;font-size:12.5px;}
+  table.crit-table th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);padding:4px 6px;}
+  table.crit-table td{padding:4px 6px;vertical-align:top;}
+  table.crit-table input, table.crit-table textarea{font-size:12.5px;padding:6px 8px;min-height:auto;}
+  table.crit-table textarea{min-height:44px;}
+  table.crit-table tr{border-top:1px solid var(--hairline);}
+  .col-lo{width:70px;} .col-id{width:70px;} .col-title{width:26%;} .col-x{width:36px;text-align:center;}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="headerbar">
+    <div>
+      <p class="eyebrow" id="assignmentEyebrow">Assessment Desk</p>
+      <h1 id="assignmentTitle">No assignment selected</h1>
+    </div>
+    <div class="meta">
+      <div class="lamp-legend">
+        <span><i class="dot green"></i>Achieved</span>
+        <span><i class="dot red"></i>Not achieved</span>
+      </div>
+      <div id="clock" style="margin-top:6px;"></div>
+    </div>
+  </div>
+
+  <div class="layout">
+    <div>
+      <div class="panel">
+        <h2>Assignment</h2>
+        <select id="assignmentSelect" onchange="switchAssignment(this.value)"></select>
+        <div class="toolbar">
+          <button class="btn small" onclick="openAssignmentModal(null)">+ New</button>
+          <button class="btn secondary small" onclick="openAssignmentModal(currentAssignmentId)">Edit criteria</button>
+          <button class="btn danger small" onclick="deleteAssignment()">Delete</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Learner roster</h2>
+        <div id="roster"></div>
+        <button class="btn btn-block" onclick="newLearner()">+ New learner</button>
+        <div class="hint" style="margin-top:12px;">Stored only on this device, per your browser profile — not shared with other users of this tool.</div>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel">
+        <h2>Submission intake</h2>
+        <div class="row2">
+          <div>
+            <label>Learner name / ID</label>
+            <input type="text" id="learnerName" placeholder="e.g. J. Adeyemi (LRN-014)">
+          </div>
+          <div>
+            <label>Organisation / subject used by learner</label>
+            <input type="text" id="orgName" placeholder="Organisation named in their submission">
+          </div>
+        </div>
+
+        <label id="submissionLabel">Submission text — Attempt 1</label>
+        <textarea id="submissionText" placeholder="Paste the learner's full submission here..."></textarea>
+        <div class="filedrop" onclick="document.getElementById('fileInput').click()">
+          📄 Click to upload a .pdf, .docx or .txt file instead — or drop it here
+          <input type="file" id="fileInput" accept=".pdf,.docx,.txt" style="display:none">
+        </div>
+        <div class="hint" id="fileStatus"></div>
+
+        <div class="toolbar">
+          <button class="btn" id="runBtn" onclick="runAssessment()">Assess submission</button>
+          <button class="btn secondary" onclick="saveLearner()">Save without assessing</button>
+          <button class="btn danger" id="delBtn" onclick="deleteLearner()" disabled>Delete learner</button>
+        </div>
+        <div class="loading-line" id="loadingLine"></div>
+      </div>
+
+      <div id="resultsWrap"></div>
+    </div>
+  </div>
+
+  <div class="footer-note">
+    Load any assignment's assessment criteria once, then reuse it for every learner on that assignment.<br>
+    This tool supports — it does not replace — professional assessor judgement and internal verification.
+  </div>
+</div>
+
+<!-- REPORT MODAL -->
+<div class="modal" id="reportModal">
+  <div class="sheet">
+    <div class="modal-head"><strong>Assessment report</strong><button class="btn secondary" onclick="closeModal('reportModal')">Close</button></div>
+    <pre id="reportBody"></pre>
+  </div>
+</div>
+
+<!-- ASSIGNMENT MODAL -->
+<div class="modal" id="assignmentModal">
+  <div class="sheet">
+    <div class="modal-head"><strong id="assignmentModalTitle">New assignment</strong><button class="btn secondary" onclick="closeModal('assignmentModal')">Close</button></div>
+
+    <label>Assignment title</label>
+    <input type="text" id="am_title" placeholder="e.g. Unit 4: Marketing Strategy">
+
+    <label>Paste the assessment criteria descriptor (or upload it)</label>
+    <textarea id="am_criteriaText" placeholder="Paste the raw text of the assessment criteria / learning outcomes document here..."></textarea>
+    <div class="filedrop" onclick="document.getElementById('am_criteriaFile').click()">
+      📄 Upload criteria descriptor (.pdf / .docx / .txt)
+      <input type="file" id="am_criteriaFile" accept=".pdf,.docx,.txt" style="display:none">
+    </div>
+    <div class="toolbar">
+      <button class="btn secondary small" onclick="extractCriteria()">🔎 Auto-detect criteria from text</button>
+    </div>
+    <div class="loading-line" id="am_extractStatus"></div>
+
+    <label>Criteria list (edit freely — this drives grading)</label>
+    <table class="crit-table" id="am_critTable">
+      <thead><tr><th class="col-lo">Group</th><th class="col-id">Code</th><th class="col-title">Title</th><th>Guidance for assessor</th><th class="col-x"></th></tr></thead>
+      <tbody id="am_critBody"></tbody>
+    </table>
+    <button class="btn secondary small" style="margin-top:8px;" onclick="addCritRow('','','','')">+ Add criterion row</button>
+
+    <label>Reference context (case study / brief) — optional, used to ground the assessor</label>
+    <textarea id="am_context" placeholder="Paste any case study or organisational context the assignment is based on..."></textarea>
+    <div class="filedrop" onclick="document.getElementById('am_contextFile').click()">
+      📄 Upload context document (.pdf / .docx / .txt)
+      <input type="file" id="am_contextFile" accept=".pdf,.docx,.txt" style="display:none">
+    </div>
+
+    <label>Word count guidance — optional, shown to the assessor as a note</label>
+    <input type="text" id="am_wordGuide" placeholder="e.g. 4000 words for Sections A-C, 1000 words for Section D">
+
+    <div class="toolbar">
+      <button class="btn" onclick="saveAssignment()">Save assignment</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================= STATE ============================= */
+let assignments = {};      // id -> {id,title,criteria:[{lo,id,title,guidance}],context,wordGuide,ts}
+let learners = {};         // id -> {id,assignmentId,name,org,attempts:[{n,text,results:{ACid:{verdict,comment}},aiIndicator,ts}],ts}
+let currentAssignmentId = null;
+let currentLearnerId = null;
+let editingAssignmentId = null;
+
+/* ============================= UTIL ============================= */
+function uid(prefix){ return prefix + "_" + Date.now() + "_" + Math.random().toString(36).slice(2,7); }
+function wordCount(t){ return (t||"").trim().split(/\s+/).filter(Boolean).length; }
+function escapeHtml(s){ return (s||"").replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]; }); }
+function verdictClass(v){
+  if(!v) return "grey";
+  v = v.toLowerCase();
+  if(v.indexOf("not") === 0 || v.indexOf("not") > -1) return "red";
+  if(v.indexOf("achiev") > -1) return "green";
+  return "grey";
+}
+function setClock(){
+  document.getElementById("clock").textContent = new Date().toLocaleString("en-GB",{weekday:"short",day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"});
+}
+setClock(); setInterval(setClock, 30000);
+let pdfWorkerReady = false;
+function ensurePdfWorker(){
+  if(pdfWorkerReady) return;
+  if(window.pdfjsLib){
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    pdfWorkerReady = true;
+  }
+}
+async function extractPdfText(file){
+  ensurePdfWorker();
+  if(!window.pdfjsLib) throw new Error("PDF reader library did not load — check your connection and try again.");
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+  let text = "";
+  for(let p=1; p<=pdf.numPages; p++){
+    const page = await pdf.getPage(p);
+    const content = await page.getTextContent();
+    const pageText = content.items.map(it=>it.str).join(" ");
+    text += pageText + "\n\n";
+  }
+  if(wordCount(text) < 5){
+    throw new Error("Couldn't find selectable text in this PDF — it may be a scanned image. Try a text-based PDF, or paste the text directly.");
+  }
+  return text;
+}
+async function readUploadedFile(file){
+  const lower = file.name.toLowerCase();
+  if(lower.endsWith(".pdf")){
+    return await extractPdfText(file);
+  }
+  if(lower.endsWith(".docx")){
+    const arrayBuffer = await file.arrayBuffer();
+    const result = await mammoth.extractRawText({arrayBuffer});
+    return result.value;
+  }
+  return await file.text();
+}
+function closeModal(id){ document.getElementById(id).style.display = "none"; }
+
+/* ============================= STORAGE ============================= */
+async function loadAll(){
+  try{
+    const alist = await window.storage.list("assignment:", false);
+    if(alist && alist.keys){
+      for(const k of alist.keys){
+        try{ const r = await window.storage.get(k, false); if(r && r.value) assignments[JSON.parse(r.value).id] = JSON.parse(r.value); }catch(e){}
+      }
+    }
+  }catch(e){ console.warn("assignment load", e); }
+
+  try{
+    const llist = await window.storage.list("learner:", false);
+    if(llist && llist.keys){
+      for(const k of llist.keys){
+        try{ const r = await window.storage.get(k, false); if(r && r.value) learners[JSON.parse(r.value).id] = JSON.parse(r.value); }catch(e){}
+      }
+    }
+  }catch(e){ console.warn("learner load", e); }
+
+  if(Object.keys(assignments).length === 0){
+    seedDefaultAssignment();
+  }
+
+  const ids = Object.keys(assignments);
+  currentAssignmentId = ids.length ? ids.sort((a,b)=>(assignments[a].ts||0)-(assignments[b].ts||0))[0] : null;
+  renderAssignmentSelect();
+  renderRoster();
+  renderHeader();
+}
+async function persistAssignment(a){ try{ await window.storage.set("assignment:"+a.id, JSON.stringify(a), false); }catch(e){ console.error(e); } }
+async function persistLearner(l){ try{ await window.storage.set("learner:"+l.id, JSON.stringify(l), false); }catch(e){ console.error(e); } }
+async function removeAssignmentStorage(id){ try{ await window.storage.delete("assignment:"+id, false); }catch(e){} }
+async function removeLearnerStorage(id){ try{ await window.storage.delete("learner:"+id, false); }catch(e){} }
+
+function seedDefaultAssignment(){
+  const id = uid("asg");
+  const criteria = [
+    {lo:"A", id:"A.1", title:"Current contexts and challenges for strategic HRM", guidance:"Expects engagement with seminal and current literature on the broader, global context and principles of strategic HRM, moving toward sector- and organisation-specific challenges, with genuine critique rather than description."},
+    {lo:"A", id:"A.2", title:"Strategic objectives, organisational change and HRM", guidance:"Requires a critical discussion of how the organisation's strategic objectives, its change agenda and its HRM function interrelate."},
+    {lo:"A", id:"A.3", title:"Impact of globalisation on HRM", guidance:"Requires critical analysis of how globalisation shapes HRM practice, policy and decision-making."},
+    {lo:"B", id:"B.1", title:"Value of effective workforce planning", guidance:"Analyse the value of workforce planning, ideally supported by an external analysis (e.g. PESTLE) and internal analysis (e.g. SWOT)."},
+    {lo:"B", id:"B.2", title:"Ethical and diversity challenges", guidance:"Evaluate ethical and diversity challenges in strategic HRM, demonstrating understanding of national and international regulation and naming specific laws."},
+    {lo:"B", id:"B.3", title:"Performance management as a strategic HRM tool", guidance:"Critically discuss performance management as a strategic HRM tool, not merely describing appraisal mechanics."},
+    {lo:"B", id:"B.4", title:"Legal and regulatory requirements on HRM", guidance:"Analyse legal and regulatory requirements affecting HRM practice, citing specific named regulations or laws."},
+    {lo:"C", id:"C.1", title:"Value of an HR strategy", guidance:"Evaluate the value of an HR strategy to an organisation, ideally connecting to broader strategic management concepts."},
+    {lo:"C", id:"C.2", title:"Organisational strategy vs HR strategy", guidance:"Analyse the relationship between organisational strategy and HR strategy, and how change to one affects the other."},
+    {lo:"C", id:"C.3", title:"Current and emerging HRM trends", guidance:"Critically evaluate current and emerging HRM trends and their likely influence on HR and organisational strategy."},
+    {lo:"D", id:"D.1", title:"Critically review the HRM context of an organisation", guidance:"Applies all prior learning outcomes to critique the organisation's HRM context specifically."},
+    {lo:"D", id:"D.2", title:"Extent HR is strategically managed", guidance:"Critically evaluates how strategically, as opposed to reactively, the organisation's human resources are actually managed."},
+    {lo:"D", id:"D.3", title:"Justified recommendations for improvement", guidance:"Develops justified, specific recommendations for improving strategic HRM for current and future requirements."}
+  ];
+  const context = "Reference case study (Network Rail, \"Managing change through training and development\"): Network Rail is responsible for Britain's rail infrastructure (around 20,000 miles of track, tens of thousands of bridges/tunnels, 18 major stations), employing roughly 35,000 people. A decade of sustained change cut costs, raised punctuality above 90%, and shifted maintenance from reactive \"find and fix\" to proactive \"predict and prevent\", backed by billions of pounds of investment. Its HR strategy centres on a diverse talent pipeline via school-leaver and graduate routes, a three-year Advanced Apprenticeship Scheme run partly with the Royal Navy, more than two dozen training centres, and a leadership development programme with a university partner. Training is framed as improving efficiency, safety and flexibility, alongside a retention risk from developing more employable staff. If the learner used a different organisation, assess their evidence about that organisation on its own merits.";
+  const a = {id, title:"Strategic HRM — Unit 7 (Network Rail case study)", criteria, context, wordGuide:"4000 words for Sections A-C, 1000 words for Section D", ts:Date.now()};
+  assignments[id] = a;
+  persistAssignment(a);
+}
+
+/* ============================= ASSIGNMENT UI ============================= */
+function renderAssignmentSelect(){
+  const sel = document.getElementById("assignmentSelect");
+  const items = Object.values(assignments).sort((a,b)=>(a.ts||0)-(b.ts||0));
+  sel.innerHTML = items.map(a=>'<option value="'+a.id+'"'+(a.id===currentAssignmentId?' selected':'')+'>'+escapeHtml(a.title)+'</option>').join("");
+  if(items.length===0) sel.innerHTML = '<option value="">No assignments yet</option>';
+}
+function renderHeader(){
+  const a = assignments[currentAssignmentId];
+  document.getElementById("assignmentEyebrow").textContent = a ? (a.criteria.length + " assessment criteria loaded") : "No assignment loaded";
+  document.getElementById("assignmentTitle").textContent = a ? a.title : "Create or select an assignment to begin";
+}
+function switchAssignment(id){
+  currentAssignmentId = id;
+  currentLearnerId = null;
+  renderHeader();
+  renderRoster();
+  newLearner();
+}
+async function deleteAssignment(){
+  if(!currentAssignmentId) return;
+  const a = assignments[currentAssignmentId];
+  if(!confirm('Delete assignment "'+a.title+'" and ALL its learners\' saved work? This cannot be undone.')) return;
+  const toDelete = Object.values(learners).filter(l=>l.assignmentId===currentAssignmentId);
+  for(const l of toDelete){ await removeLearnerStorage(l.id); delete learners[l.id]; }
+  await removeAssignmentStorage(currentAssignmentId);
+  delete assignments[currentAssignmentId];
+  const ids = Object.keys(assignments);
+  currentAssignmentId = ids.length ? ids[0] : null;
+  renderAssignmentSelect(); renderHeader(); renderRoster(); newLearner();
+}
+
+/* ---- Assignment modal / criteria editor ---- */
+function openAssignmentModal(assignmentIdOrNull){
+  editingAssignmentId = assignmentIdOrNull;
+  const a = assignmentIdOrNull ? assignments[assignmentIdOrNull] : null;
+  document.getElementById("assignmentModalTitle").textContent = a ? "Edit assignment" : "New assignment";
+  document.getElementById("am_title").value = a ? a.title : "";
+  document.getElementById("am_criteriaText").value = "";
+  document.getElementById("am_context").value = a ? (a.context||"") : "";
+  document.getElementById("am_wordGuide").value = a ? (a.wordGuide||"") : "";
+  document.getElementById("am_extractStatus").textContent = "";
+  const body = document.getElementById("am_critBody");
+  body.innerHTML = "";
+  if(a && a.criteria && a.criteria.length){
+    a.criteria.forEach(c=>addCritRow(c.lo,c.id,c.title,c.guidance));
+  } else {
+    addCritRow("","AC1","","");
+  }
+  document.getElementById("assignmentModal").style.display = "flex";
+}
+function addCritRow(lo,id,title,guidance){
+  const body = document.getElementById("am_critBody");
+  const tr = document.createElement("tr");
+  tr.innerHTML =
+    '<td><input type="text" class="c-lo" value="'+escapeHtml(lo||"")+'" placeholder="LO A"></td>'+
+    '<td><input type="text" class="c-id" value="'+escapeHtml(id||"")+'" placeholder="A.1"></td>'+
+    '<td><input type="text" class="c-title" value="'+escapeHtml(title||"")+'" placeholder="Criterion title"></td>'+
+    '<td><textarea class="c-guidance" placeholder="What the assessor should look for">'+escapeHtml(guidance||"")+'</textarea></td>'+
+    '<td class="col-x"><button class="btn danger small" onclick="this.closest(&#39;tr&#39;).remove()">✕</button></td>';
+  body.appendChild(tr);
+}
+document.getElementById("am_criteriaFile").addEventListener("change", async (e)=>{
+  const file = e.target.files[0]; if(!file) return;
+  document.getElementById("am_extractStatus").textContent = "Reading " + file.name + "...";
+  try{
+    const text = await readUploadedFile(file);
+    document.getElementById("am_criteriaText").value = text;
+    document.getElementById("am_extractStatus").textContent = "Loaded " + file.name + ". Click \"Auto-detect criteria from text\" to parse it.";
+  }catch(err){
+    document.getElementById("am_extractStatus").textContent = "Could not read file: " + err.message;
+  }
+});
+document.getElementById("am_contextFile").addEventListener("change", async (e)=>{
+  const file = e.target.files[0]; if(!file) return;
+  try{
+    const text = await readUploadedFile(file);
+    document.getElementById("am_context").value = text;
+  }catch(err){ alert("Could not read file: " + err.message); }
+});
+
+/* Rule-based criteria extraction — no AI/API involved.
+   Looks for lines that start with a criterion-style code (e.g. "A.1", "1.2", "LO3", "AC4")
+   and lines that look like learning-outcome / group headers (e.g. "Learning Outcome 1", "LO 2"). */
+const CODE_LINE_RE = /^\s*([A-Za-z]{0,4}\.?\d{1,3}(?:\.\d{1,3}){0,2})\s*[:.\-–)]?\s+(.+?)\s*$/;
+const LO_HEADER_RE = /^\s*(learning outcome\s*\d+|LO\s*\d+|unit\s*\d+|section\s*[A-Za-z0-9]+|part\s*[A-Za-z0-9]+)\b\s*[:.\-–]?\s*(.*)$/i;
+
+function extractCriteria(){
+  const raw = document.getElementById("am_criteriaText").value.trim();
+  if(wordCount(raw) < 10){ alert("Paste or upload the criteria descriptor text first."); return; }
+  const status = document.getElementById("am_extractStatus");
+  status.textContent = "Scanning text for criteria...";
+
+  const lines = raw.split(/\r?\n/).map(l=>l.trim()).filter(l=>l.length>0);
+  const found = [];
+  let currentLo = "";
+  let seq = 0;
+
+  lines.forEach(line=>{
+    const loMatch = line.match(LO_HEADER_RE);
+    const codeMatch = line.match(CODE_LINE_RE);
+    if(loMatch && !codeMatch){
+      currentLo = loMatch[1].trim();
+      return;
+    }
+    if(codeMatch){
+      const code = codeMatch[1];
+      const rest = codeMatch[2];
+      // split "Title — guidance" style text: use first clause as title, whole line as guidance basis
+      const title = rest.length > 70 ? rest.slice(0,70).replace(/\s+\S*$/,"") + "…" : rest;
+      found.push({ lo: currentLo, id: code, title: title, guidance: rest });
+      return;
+    }
+  });
+
+  if(found.length === 0){
+    status.textContent = "No criterion-style codes (e.g. A.1, 1.2, LO3) were detected in this text. Add rows manually below, or edit the pasted text so each criterion starts on its own line with a short code.";
+    return;
+  }
+
+  document.getElementById("am_critBody").innerHTML = "";
+  found.forEach(c=>{ seq++; addCritRow(c.lo, c.id || ("C"+seq), c.title, c.guidance); });
+  status.textContent = "Detected " + found.length + " criteria by pattern-matching — review and edit below before saving (this is a simple text scan, not AI, so double-check titles/guidance).";
+}
+async function saveAssignment(){
+  const title = document.getElementById("am_title").value.trim();
+  if(!title){ alert("Give the assignment a title."); return; }
+  const rows = document.querySelectorAll("#am_critBody tr");
+  const criteria = [];
+  rows.forEach(tr=>{
+    const id = tr.querySelector(".c-id").value.trim();
+    const t = tr.querySelector(".c-title").value.trim();
+    if(!id && !t) return;
+    criteria.push({
+      lo: tr.querySelector(".c-lo").value.trim(),
+      id: id || ("AC"+(criteria.length+1)),
+      title: t,
+      guidance: tr.querySelector(".c-guidance").value.trim()
+    });
+  });
+  if(criteria.length===0){ alert("Add at least one assessment criterion."); return; }
+  const id = editingAssignmentId || uid("asg");
+  const existing = assignments[id] || {};
+  const a = {
+    ...existing, id, title, criteria,
+    context: document.getElementById("am_context").value.trim(),
+    wordGuide: document.getElementById("am_wordGuide").value.trim(),
+    ts: existing.ts || Date.now()
+  };
+  assignments[id] = a;
+  await persistAssignment(a);
+  currentAssignmentId = id;
+  closeModal("assignmentModal");
+  renderAssignmentSelect(); renderHeader(); renderRoster();
+}
+
+/* ============================= LEARNER / ROSTER ============================= */
+function renderRoster(){
+  const el = document.getElementById("roster");
+  const items = Object.values(learners).filter(l=>l.assignmentId===currentAssignmentId).sort((a,b)=>(b.ts||0)-(a.ts||0));
+  if(items.length===0){ el.innerHTML = '<div class="hint">No learners yet for this assignment.</div>'; return; }
+  el.innerHTML = items.map(l=>{
+    const latest = l.attempts && l.attempts.length ? l.attempts[l.attempts.length-1] : null;
+    let lamp = "#9AA0A6";
+    if(latest){
+      const allGreen = Object.values(latest.results||{}).every(r=>verdictClass(r.verdict)==="green");
+      lamp = allGreen ? "#2E6B4F" : "#A83C3C";
+    }
+    return '<div class="roster-item '+(l.id===currentLearnerId?'active':'')+'" onclick="selectLearner(\''+l.id+'\')">'+
+      '<span class="rlamp" style="background:'+lamp+'"></span>'+
+      '<span class="rname">'+escapeHtml(l.name||"Untitled learner")+'</span>'+
+      (latest ? '<span class="hint" style="margin:0;">#'+latest.n+'</span>' : '') +
+      '</div>';
+  }).join("");
+}
+function newLearner(){
+  currentLearnerId = null;
+  document.getElementById("learnerName").value="";
+  document.getElementById("orgName").value="";
+  document.getElementById("submissionText").value="";
+  document.getElementById("submissionLabel").textContent="Submission text — Attempt 1";
+  document.getElementById("fileStatus").textContent="";
+  document.getElementById("delBtn").disabled = true;
+  document.getElementById("resultsWrap").innerHTML="";
+  renderRoster();
+}
+function selectLearner(id){
+  const l = learners[id];
+  if(!l) return;
+  currentLearnerId = id;
+  document.getElementById("learnerName").value = l.name || "";
+  document.getElementById("orgName").value = l.org || "";
+  const latest = l.attempts && l.attempts.length ? l.attempts[l.attempts.length-1] : null;
+  document.getElementById("submissionText").value = latest ? latest.text : "";
+  document.getElementById("submissionLabel").textContent = "Submission text — Attempt " + ((l.attempts?l.attempts.length:0)+ (needsResubmit(latest)?1:0) || 1);
+  document.getElementById("fileStatus").textContent="";
+  document.getElementById("delBtn").disabled = false;
+  renderRoster();
+  if(latest) renderResults(l); else document.getElementById("resultsWrap").innerHTML="";
+}
+function needsResubmit(attempt){
+  if(!attempt) return false;
+  return !Object.values(attempt.results||{}).every(r=>verdictClass(r.verdict)==="green");
+}
+async function saveLearner(){
+  const name = document.getElementById("learnerName").value.trim();
+  if(!name){ alert("Give the learner a name or ID first."); return; }
+  if(!currentAssignmentId){ alert("Create or select an assignment first."); return; }
+  const id = currentLearnerId || uid("lrn");
+  const existing = learners[id] || {assignmentId: currentAssignmentId, attempts: []};
+  const l = { ...existing, id, assignmentId: currentAssignmentId, name, org: document.getElementById("orgName").value.trim(), ts: Date.now() };
+  learners[id] = l;
+  currentLearnerId = id;
+  await persistLearner(l);
+  renderRoster();
+  document.getElementById("delBtn").disabled = false;
+}
+async function deleteLearner(){
+  if(!currentLearnerId) return;
+  if(!confirm("Delete this learner's stored submissions and results? This cannot be undone.")) return;
+  await removeLearnerStorage(currentLearnerId);
+  delete learners[currentLearnerId];
+  newLearner();
+}
+
+/* ============================= FILE UPLOAD (submission) ============================= */
+document.getElementById("fileInput").addEventListener("change", async (e)=>{
+  const file = e.target.files[0]; if(!file) return;
+  const status = document.getElementById("fileStatus");
+  status.textContent = "Reading " + file.name + "...";
+  try{
+    const text = await readUploadedFile(file);
+    document.getElementById("submissionText").value = text;
+    status.textContent = "Loaded " + file.name + " (" + wordCount(text) + " words)";
+  }catch(err){
+    status.textContent = "Could not read that file: " + err.message;
+  }
+});
+
+/* ============================= RULE-BASED ASSESSMENT (no AI, no API, works offline) ============================= */
+const STOPWORDS = new Set(["the","a","an","and","or","but","of","to","in","on","for","with","is","are","be","by","as","at",
+  "from","that","this","it","its","their","they","you","your","can","will","should","must","may","which","what","how",
+  "into","about","such","these","those","also","not","no","than","then","more","most","other","some","each","any",
+  "using","use","used","will","would","could","been","being","have","has","had","was","were","there","here","across",
+  "within","between","during","over","under","above","below","out","up","down","if","so","because","while","when",
+  "where","who","whom","whose","all","both","few","own","same","very","just","only","itself","onto","upon"]);
+
+function extractKeywords(str){
+  if(!str) return [];
+  const words = (str.toLowerCase().match(/[a-z][a-z0-9\-]{2,}/g) || []);
+  const seen = new Set();
+  const out = [];
+  words.forEach(w=>{
+    if(STOPWORDS.has(w) || seen.has(w)) return;
+    seen.add(w); out.push(w);
+  });
+  return out;
+}
+
+/* Fuzzy prefix matching: words of 6+ letters are compared by their first 5 characters,
+   so normal word-form variation (analyse/analysis/analytical, ethical/ethics,
+   diversity/diversification, strategy/strategic, critique/critical, regulation/regulatory)
+   still counts as a match. Short words/acronyms (SWOT, HRM, KPI, law) require an exact match
+   so we don't get false hits from truncating a short, distinctive term. */
+function fuzzyKey(word){ return word.length >= 6 ? word.slice(0,5) : word; }
+
+function tokenizeSubmission(submissionLower){
+  const words = submissionLower.match(/[a-z][a-z0-9\-]{2,}/g) || [];
+  const exact = new Set(words);
+  const fuzzy = new Set(words.filter(w=>w.length>=6).map(fuzzyKey));
+  return { exact, fuzzy };
+}
+
+/* Whole-word-or-fuzzy match against a precomputed submission index */
+function keywordHits(keywords, index){
+  return keywords.filter(k=> index.exact.has(k) || (k.length>=6 && index.fuzzy.has(fuzzyKey(k))));
+}
+
+function assessCriterionLocal(c, submissionIndex){
+  const basis = (c.guidance && c.guidance.trim()) ? c.guidance : c.title;
+  const keywords = extractKeywords(basis);
+  if(keywords.length === 0){
+    return { id:c.id, verdict:"Not Achieved",
+      comment:"No guidance or title text was available to check this criterion against. Add guidance text to the assignment's criterion row so keyword matching has something to look for." };
+  }
+  const hits = keywordHits(keywords, submissionIndex);
+  const ratio = hits.length / keywords.length;
+  const threshold = keywords.length <= 3 ? 1 : 0.5; // small keyword sets need a full match, larger sets need half
+  const achieved = hits.length > 0 && ratio >= threshold;
+  let comment;
+  if(achieved){
+    comment = "Keyword match: found " + hits.length + " of " + keywords.length + " expected terms/word-forms (" + hits.slice(0,8).join(", ") + "). Rule-based check only — please still read the submission to confirm the evidence is genuine and adequate.";
+  } else {
+    const missing = keywords.filter(k=>!hits.includes(k));
+    comment = "Insufficient keyword coverage — found " + hits.length + " of " + keywords.length + " expected terms/word-forms. Missing/weak: " + missing.slice(0,8).join(", ") + ". Ask the learner to address these terms/concepts more explicitly.";
+  }
+  return { id: c.id, verdict: achieved ? "Achieved" : "Not Achieved", comment };
+}
+
+function assessAllLocal(criteria, submissionText){
+  const submissionIndex = tokenizeSubmission(submissionText.toLowerCase());
+  const out = {};
+  criteria.forEach(c=>{ out[c.id] = assessCriterionLocal(c, submissionIndex); });
+  return out;
+}
+
+/* Rule-based writing-style flag (heuristic only — not an AI detector). Looks at generic
+   stock phrases, vocabulary variety, and sentence-length uniformity. */
+const GENERIC_PHRASES = ["furthermore","moreover","in conclusion","it is important to note","it is evident that",
+  "in today's world","plays a crucial role","delve into","this essay will","overall, it can be said",
+  "in summary","additionally, it","one could argue that","on the other hand"];
+
+function computeStyleFlag(text){
+  const sentences = text.split(/(?<=[.!?])\s+/).filter(s=>s.trim().length>0);
+  const words = text.split(/\s+/).filter(Boolean);
+  const wordCount = words.length;
+  const avgSentenceLen = sentences.length ? wordCount / sentences.length : 0;
+  const uniqueWords = new Set(words.map(w=>w.toLowerCase().replace(/[^a-z0-9]/g,""))).size;
+  const lexicalDiversity = wordCount ? uniqueWords / wordCount : 0;
+  const lowerText = text.toLowerCase();
+  const flags = [];
+  let score = 25;
+  GENERIC_PHRASES.forEach(p=>{ if(lowerText.includes(p)){ score += 7; flags.push('Uses a generic stock phrase: "' + p + '"'); } });
+  if(lexicalDiversity < 0.35 && wordCount > 150){ score += 15; flags.push("Low vocabulary variety relative to the length of the text"); }
+  if(avgSentenceLen > 28){ score += 10; flags.push("Long, fairly uniform sentence structure throughout"); }
+  if(!/[!?]/.test(text) && wordCount > 200){ score += 5; flags.push("No question or exclamation marks across a long passage"); }
+  if(!/\b(i|we|my|our)\b/i.test(text) && wordCount > 150){ score += 5; flags.push("Little first-person voice or personal framing"); }
+  score = Math.max(0, Math.min(100, Math.round(score)));
+  const reasoning = "Rule-based heuristic score from stock-phrase count, vocabulary variety, and sentence-length uniformity. This is a simple text scan, not an AI model or a validated AI-detection tool, and can easily be wrong.";
+  return { indicator_score: score, reasoning, flags };
+}
+
+/* ============================= RUN ASSESSMENT ============================= */
+async function runAssessment(){
+  const name = document.getElementById("learnerName").value.trim();
+  const org = document.getElementById("orgName").value.trim();
+  const text = document.getElementById("submissionText").value;
+  const assignment = assignments[currentAssignmentId];
+  if(!assignment){ alert("Create or select an assignment first."); return; }
+  if(!name){ alert("Give the learner a name or ID first."); return; }
+  if(wordCount(text) < 30){ alert("Paste or upload the learner's submission text first."); return; }
+
+  const runBtn = document.getElementById("runBtn");
+  const loadingLine = document.getElementById("loadingLine");
+  runBtn.disabled = true;
+
+  try{
+    loadingLine.textContent = "Matching submission against criteria (rule-based, offline)...";
+    const results = assessAllLocal(assignment.criteria, text);
+    const styleFlag = computeStyleFlag(text);
+
+    const id = currentLearnerId || uid("lrn");
+    const existing = learners[id] || {id, assignmentId: currentAssignmentId, name, org, attempts: []};
+    const attemptN = (existing.attempts ? existing.attempts.length : 0) + 1;
+    existing.attempts = existing.attempts || [];
+    existing.attempts.push({ n: attemptN, text, results, aiIndicator: styleFlag, ts: Date.now() });
+    existing.name = name; existing.org = org; existing.assignmentId = currentAssignmentId; existing.ts = Date.now();
+    learners[id] = existing;
+    currentLearnerId = id;
+    await persistLearner(existing);
+    document.getElementById("delBtn").disabled = false;
+    renderRoster();
+    renderResults(existing);
+    loadingLine.textContent = "Assessment complete — Attempt " + attemptN + ".";
+  }catch(err){
+    loadingLine.textContent = "";
+    alert("Assessment could not be completed: " + err.message);
+  }finally{
+    runBtn.disabled = false;
+  }
+}
+
+/* ============================= RENDER RESULTS ============================= */
+function renderResults(learner){
+  const assignment = assignments[learner.assignmentId];
+  const latest = learner.attempts[learner.attempts.length-1];
+  const results = latest.results || {};
+  const wc = wordCount(latest.text);
+  const criteria = assignment.criteria;
+  const achieved = criteria.filter(c => verdictClass((results[c.id]||{}).verdict) === "green").length;
+  const total = criteria.length;
+  const notAchieved = criteria.filter(c => verdictClass((results[c.id]||{}).verdict) !== "green");
+
+  let html = "";
+  html += '<div class="stat-strip">'+
+    '<div class="stat"><div class="num">'+achieved+"/"+total+'</div><div class="lbl">Criteria achieved</div></div>'+
+    '<div class="stat"><div class="num">'+wc+'</div><div class="lbl">Words'+(assignment.wordGuide?' — guide: '+escapeHtml(assignment.wordGuide):'')+'</div></div>'+
+    '<div class="stat"><div class="num">'+(notAchieved.length===0?"ACHIEVED":"RESUBMIT")+'</div><div class="lbl">Overall outcome — Attempt '+latest.n+'</div></div>'+
+    '<div class="stat"><div class="num">'+(latest.aiIndicator ? latest.aiIndicator.indicator_score+"%" : "—")+'</div><div class="lbl">Writing-style flag (heuristic)</div></div>'+
+    '</div>';
+
+  if(notAchieved.length){
+    html += '<div class="resubmit-banner"><strong>Resubmission required</strong>The learner must review and modify the following criteria, then resubmit the full assignment for re-assessment: '+
+      notAchieved.map(c=>c.id).join(", ") + '.</div>';
+  } else {
+    html += '<div class="achieved-banner"><strong>All criteria achieved.</strong> No resubmission required.</div>';
+  }
+
+  html += '<div class="board"><div class="board-title">Assessment board — Attempt ' + latest.n + '</div>';
+  criteria.forEach(c=>{
+    const r = results[c.id];
+    const vc = verdictClass(r ? r.verdict : null);
+    html += '<div class="board-row" onclick="toggleDetail(\''+c.id.replace(/'/g,"")+'\')">'+
+      '<span class="code">'+escapeHtml(c.id)+'</span>'+
+      '<span class="title">'+escapeHtml(c.title)+'</span>'+
+      '<span class="verdict"><span class="lampbig '+vc+'"></span>'+(r?escapeHtml(r.verdict):"Pending")+'</span>'+
+      '</div>';
+  });
+  html += '</div>';
+
+  html += '<div id="acDetails">';
+  criteria.forEach(c=>{
+    const r = results[c.id];
+    if(!r) return;
+    const vc = verdictClass(r.verdict);
+    const safeId = c.id.replace(/[^a-zA-Z0-9]/g,"_");
+    html += '<div class="ac-detail" id="detail-'+safeId+'" data-key="'+escapeHtml(c.id)+'" style="display:none;">'+
+      '<span class="verdict-pill '+vc+'">'+escapeHtml(r.verdict)+'</span>'+
+      '<h3>'+escapeHtml(c.id)+" — "+escapeHtml(c.title)+'</h3>'+
+      '<p><span class="label">Comment: </span>'+escapeHtml(r.comment||"—")+'</p>'+
+      '</div>';
+  });
+  html += '</div>';
+
+  if(latest.aiIndicator){
+    html += '<div class="panel">'+
+      '<h2>Writing-style flag</h2>'+
+      '<div style="display:flex;gap:18px;flex-wrap:wrap;align-items:center;">'+
+      '<div class="stat" style="min-width:110px;"><div class="num">'+latest.aiIndicator.indicator_score+'%</div><div class="lbl">Generic/formulaic score</div></div>'+
+      '<p style="flex:1;min-width:220px;font-size:13px;margin:0;">'+escapeHtml(latest.aiIndicator.reasoning||"")+'</p>'+
+      '</div>'+
+      (latest.aiIndicator.flags && latest.aiIndicator.flags.length ? '<ul class="flag-list">'+latest.aiIndicator.flags.map(f=>"<li>"+escapeHtml(f)+"</li>").join("")+'</ul>' : "")+
+      '<div class="disclaimer">This is a <strong>simple rule-based text scan only</strong> — not an AI model and not a forensic AI-detection or plagiarism tool. Do not use this score alone to make an academic misconduct decision; corroborate with a conversation with the learner and your institution\'s own processes.</div>'+
+      '</div>';
+  }
+
+  if(notAchieved.length){
+    html += '<div class="toolbar"><button class="btn" onclick="startResubmission()">Log resubmission (Attempt '+(latest.n+1)+')</button>'+
+      '<button class="btn secondary" onclick="openReport(\''+learner.id+'\')">Generate printable report</button></div>';
+  } else {
+    html += '<div class="toolbar"><button class="btn secondary" onclick="openReport(\''+learner.id+'\')">Generate printable report</button></div>';
+  }
+
+  if(learner.attempts.length > 1){
+    html += '<div class="panel attempt-history"><h2>Attempt history</h2>';
+    learner.attempts.slice().reverse().forEach(att=>{
+      const attAllGreen = Object.values(att.results||{}).every(r=>verdictClass(r.verdict)==="green");
+      html += '<div class="attempt-row" onclick="viewAttempt(\''+learner.id+'\','+att.n+')">'+
+        '<span>Attempt '+att.n+' — '+new Date(att.ts).toLocaleDateString("en-GB")+'</span>'+
+        '<span class="apill '+(attAllGreen?"green":"red")+'">'+(attAllGreen?"Achieved":"Not achieved")+'</span>'+
+        '</div>';
+    });
+    html += '</div>';
+  }
+
+  document.getElementById("resultsWrap").innerHTML = html;
+}
+function toggleDetail(idKey){
+  document.querySelectorAll(".ac-detail").forEach(d=>{
+    if(d.getAttribute("data-key")===idKey){ d.style.display = d.style.display==="none" ? "block" : "none"; d.scrollIntoView({behavior:"smooth", block:"nearest"}); }
+    else { d.style.display = "none"; }
+  });
+}
+function startResubmission(){
+  document.getElementById("submissionText").value = "";
+  document.getElementById("submissionLabel").textContent = "Submission text — new resubmission (paste the revised assignment)";
+  document.getElementById("fileStatus").textContent = "";
+  window.scrollTo({top:0, behavior:"smooth"});
+}
+function viewAttempt(learnerId, n){
+  const l = learners[learnerId];
+  const att = l.attempts.find(a=>a.n===n);
+  if(!att) return;
+  const fakeLearner = { ...l, attempts: l.attempts.filter(a=>a.n<=n) };
+  renderResults(fakeLearner);
+}
+
+/* ============================= REPORT ============================= */
+function openReport(learnerId){
+  const l = learners[learnerId];
+  const assignment = assignments[l.assignmentId];
+  const latest = l.attempts[l.attempts.length-1];
+  const results = latest.results || {};
+  let lines = [];
+  lines.push("ASSESSMENT REPORT");
+  lines.push(assignment.title);
+  lines.push("Learner: " + l.name);
+  if(l.org) lines.push("Organisation / subject: " + l.org);
+  lines.push("Attempt: " + latest.n + " of " + l.attempts.length);
+  lines.push("Word count: " + wordCount(latest.text) + (assignment.wordGuide ? " (guide: " + assignment.wordGuide + ")" : ""));
+  lines.push("Date assessed: " + new Date(latest.ts).toLocaleString("en-GB"));
+  lines.push("");
+  assignment.criteria.forEach(c=>{
+    const r = results[c.id];
+    if(!r) return;
+    lines.push("--- " + c.id + " — " + c.title + " ---");
+    lines.push("Verdict: " + r.verdict);
+    lines.push("Comment: " + (r.comment||"—"));
+    lines.push("");
+  });
+  const notAchieved = assignment.criteria.filter(c => verdictClass((results[c.id]||{}).verdict) !== "green");
+  lines.push("Overall outcome: " + (notAchieved.length===0 ? "ACHIEVED — all criteria met." : "RESUBMISSION REQUIRED — revise: " + notAchieved.map(c=>c.id).join(", ")));
+  if(latest.aiIndicator){
+    lines.push("");
+    lines.push("Writing-style flag (rule-based text scan, not a certified tool): " + latest.aiIndicator.indicator_score + "%");
+    lines.push("Reasoning: " + latest.aiIndicator.reasoning);
+  }
+  document.getElementById("reportBody").textContent = lines.join("\n");
+  document.getElementById("reportModal").style.display = "flex";
+}
+
+/* ============================= INIT ============================= */
+loadAll();
+</script>
+</body>
+</html>
