@@ -1,0 +1,1684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Strategic HRM — Assessment System</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root{
+    --ink:#14213d;
+    --paper:#f6f5f0;
+    --line:#d6d2c4;
+    --panel:#ffffff;
+    --navy:#14213d;
+    --navy-dark:#0b1526;
+    --gold:#b8892b;
+    --gold-light:#f2e6c8;
+    --achieved:#3f6b45;
+    --achieved-bg:#e7f1e6;
+    --notachieved:#a13a2c;
+    --notachieved-bg:#fbe9e4;
+    --muted:#5c5f6b;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; padding:24px;
+    background:var(--paper);
+    color:var(--ink);
+    font-family: "Iowan Old Style","Georgia","Times New Roman",serif;
+    line-height:1.5;
+  }
+  .util{ font-family: "Avenir Next","Segoe UI",system-ui,sans-serif; }
+
+  .masthead{
+    display:flex; align-items:baseline; justify-content:space-between;
+    border-bottom:3px solid var(--gold);
+    padding-bottom:14px; margin-bottom:16px; flex-wrap:wrap; gap:10px;
+  }
+  .masthead h1{ font-size:26px; margin:0; letter-spacing:0.2px; font-weight:600; color:var(--navy-dark); }
+  .masthead .tag{
+    font-family: "Avenir Next","Segoe UI",system-ui,sans-serif;
+    font-size:12px; text-transform:uppercase; letter-spacing:1.5px; color:var(--gold); font-weight:700;
+  }
+
+  /* ---- Tab nav ---- */
+  .tabnav{ display:flex; gap:8px; margin-bottom:20px; font-family:"Avenir Next","Segoe UI",system-ui,sans-serif; }
+  .tab-btn{
+    background:var(--panel); border:1px solid var(--line); border-bottom:none;
+    padding:10px 18px; font-size:13.5px; font-weight:700; cursor:pointer; border-radius:6px 6px 0 0;
+    color:var(--muted);
+  }
+  .tab-btn.active{ background:var(--navy); color:#fff; }
+  .view{ display:none; }
+  .view.active{ display:block; }
+
+  .meta-row{
+    display:grid; grid-template-columns: repeat(auto-fit,minmax(200px,1fr));
+    gap:12px; margin-bottom:18px;
+  }
+  .meta-row label{
+    display:block; font-family:"Avenir Next","Segoe UI",system-ui,sans-serif;
+    font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin-bottom:4px;
+  }
+  .meta-row input[type=text], .meta-row input[type=date]{
+    width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:3px;
+    font-family:"Avenir Next","Segoe UI",system-ui,sans-serif; font-size:14px; background:var(--panel);
+  }
+
+  /* ---- Split layout: PDF panel + marking panel ---- */
+  .split{ display:flex; gap:20px; align-items:flex-start; }
+  .split > .pdf-panel{ flex:0 0 38%; }
+  .split > div:last-child{ flex:1; min-width:0; }
+  @media (max-width:980px){ .split{ flex-direction:column; } .split > .pdf-panel{ flex:1; width:100%; } }
+
+  .pdf-panel{
+    position:sticky; top:16px; background:var(--panel); border:1px solid var(--line); border-radius:6px;
+    padding:16px; max-height:88vh; display:flex; flex-direction:column;
+  }
+  .upload-row{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:10px; }
+  .filebtn{
+    font-family:"Avenir Next","Segoe UI",system-ui,sans-serif; font-size:13.5px; font-weight:700;
+    background:var(--navy); color:#fff; border:none; padding:10px 16px; border-radius:4px; cursor:pointer;
+  }
+  .filebtn:hover{ background:var(--navy-dark); }
+  #fileInput{ display:none; }
+  .fname{ font-family:"Avenir Next","Segoe UI",system-ui,sans-serif; font-size:12.5px; color:var(--muted); }
+  .status{ font-family:"Avenir Next","Segoe UI",system-ui,sans-serif; font-size:12.5px; color:var(--navy-dark); }
+  .status.err{ color:var(--notachieved); }
+
+  .zoom-row{ display:flex; align-items:center; gap:8px; margin-bottom:10px; font-family:"Avenir Next","Segoe UI",system-ui,sans-serif; }
+  .zoom-btn{
+    background:#fff; border:1px solid var(--line); color:var(--navy-dark); font-weight:700; font-size:15px;
+    width:28px; height:28px; line-height:26px; text-align:center; border-radius:4px; cursor:pointer; padding:0;
+  }
+  .zoom-btn:hover{ background:var(--gold-light); }
+  .zoom-label{ font-size:12px; color:var(--muted); min-width:42px; text-align:center; }
+  .zoom-reset{ font-size:11.5px; color:var(--navy); text-decoration:underline; cursor:pointer; }
+
+  #pdfPages{
+    overflow:auto; flex:1; border:1px solid var(--line); border-radius:4px; background:#e9e7de;
+    padding:10px; display:flex; flex-direction:column; align-items:center; gap:14px; min-height:200px;
+  }
+  #pdfPages canvas{ max-width:none; box-shadow:0 1px 6px rgba(0,0,0,0.25); background:#fff; }
+  .pdf-placeholder{ font-family:"Avenir Next","Segoe UI",system-ui,sans-serif; font-size:13px; color:var(--muted); text-align:center; padding:40px 10px; }
+  .page-label{ font-family:"Avenir Next","Segoe UI",system-ui,sans-serif; font-size:11px; color:var(--muted); }
+
+  .extract-toggle{
+    margin-top:8px; font-family:"Avenir Next","Segoe UI",system-ui,sans-serif; font-size:12px;
+    color:var(--navy); cursor:pointer; text-decoration:underline; display:inline-block;
+  }
+  #extractPreview{
+    display:none; margin-top:8px; max-height:140px; overflow-y:auto;
+    background:#fbfaf6; border:1px solid var(--line); padding:8px 10px; border-radius:4px;
+    font-family:"Avenir Next","Segoe UI",system-ui,sans-serif; font-size:11.5px; color:var(--muted); white-space:pre-wrap;
+  }
+
+  .summary{ display:flex; gap:16px; flex-wrap:wrap; margin-bottom:16px; font-family:"Avenir Next","Segoe UI",system-ui,sans-serif; }
+  .summary .pill{ background:var(--panel); border:1px solid var(--line); border-radius:20px; padding:6px 16px; font-size:13px; font-weight:600; }
+  .summary .pill.good{ color:var(--achieved); border-color:var(--achieved); }
+  .summary .pill.bad{ color:var(--notachieved); border-color:var(--notachieved); }
+
+  .overall-box{
+    font-family:"Avenir Next","Segoe UI",system-ui,sans-serif;
+    border-radius:6px; padding:14px 16px; margin-bottom:16px; border:1px solid var(--line);
+  }
+  .overall-box.is-achieved{ background:var(--achieved-bg); border-color:var(--achieved); }
+  .overall-box.is-notachieved{ background:var(--notachieved-bg); border-color:var(--notachieved); }
+  .overall-box.is-pending{ background:#f2f1ea; border-color:var(--line); }
+  .overall-head{ display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:8px; }
+  .overall-label{ font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); font-weight:700; }
+  .overall-value{ font-size:16px; font-weight:800; }
+  .overall-box.is-achieved .overall-value{ color:var(--achieved); }
+  .overall-box.is-notachieved .overall-value{ color:var(--notachieved); }
+  .overall-box.is-pending .overall-value{ color:var(--muted); }
+  .overall-detail{ margin-top:8px; font-size:12.5px; color:var(--ink); }
+  .overall-detail .oa-note{ font-weight:700; margin-bottom:6px; }
+  .overall-detail ul{ margin:0; padding-left:18px; }
+  .overall-detail li{ margin-bottom:5px; }
+  @media print{
+    .overall-box{ break-inside:avoid; }
+  }
+
+  table{ width:100%; border-collapse:collapse; background:var(--panel); border:1px solid var(--line); }
+  thead th{
+    background:var(--navy); color:#fff; text-align:left; padding:10px 10px;
+    font-family:"Avenir Next","Segoe UI",system-ui,sans-serif; font-size:11.5px; text-transform:uppercase; letter-spacing:0.6px; font-weight:600;
+  }
+  tbody td{ border-top:1px solid var(--line); padding:11px 9px; vertical-align:top; font-size:13.5px; }
+  tr.lo-first td.lo-cell{ border-top:3px solid var(--gold); }
+  td.lo-cell{ font-weight:600; width:16%; background:#eef0f5; color:var(--navy-dark); }
+  td.crit-cell{ width:22%; }
+  td.evidence-cell{ width:27%; color:var(--muted); font-size:12.5px; }
+  td.decision-cell{ width:15%; }
+  td.comment-cell{ width:20%; }
+
+  .toggle-group{ display:flex; flex-direction:column; gap:6px; font-family:"Avenir Next","Segoe UI",system-ui,sans-serif; }
+  .toggle-btn{ border:1px solid var(--line); background:#fff; padding:6px 8px; border-radius:4px; font-size:12px; cursor:pointer; text-align:left; font-weight:600; }
+  .toggle-btn.achieved.active{ background:var(--achieved); color:#fff; border-color:var(--achieved); }
+  .toggle-btn.notachieved.active{ background:var(--notachieved); color:#fff; border-color:var(--notachieved); }
+  .reset-decision-btn{
+    display:none; border:1px solid var(--muted); background:#fff; color:var(--muted); padding:5px 8px;
+    border-radius:4px; font-size:11px; cursor:pointer; text-align:left; font-weight:600;
+  }
+  .reset-decision-btn:hover{ background:#f2f1ea; color:var(--navy-dark); }
+
+  textarea.comment-box{
+    width:100%; min-height:64px; border:1px solid var(--line); border-radius:4px; padding:6px 8px;
+    font-family:"Avenir Next","Segoe UI",system-ui,sans-serif; font-size:12px; resize:vertical;
+  }
+
+  .footer-actions{ margin-top:18px; display:flex; gap:12px; flex-wrap:wrap; }
+  .print-btn, .save-btn, .reset-btn, .add-btn, .remove-btn{
+    font-family:"Avenir Next","Segoe UI",system-ui,sans-serif; font-weight:600; font-size:13px;
+    border:none; padding:9px 16px; border-radius:4px; cursor:pointer;
+  }
+  .print-btn{ background:var(--navy-dark); color:#fff; }
+  .save-btn{ background:var(--gold); color:#2a1f04; }
+  .save-btn:hover{ background:#a17a26; }
+  .reset-btn{ background:transparent; color:var(--notachieved); border:1px solid var(--notachieved); }
+  .add-btn{ background:var(--navy); color:#fff; }
+  .remove-btn{ background:transparent; color:var(--notachieved); border:1px solid var(--notachieved); padding:5px 10px; font-size:12px; }
+
+  @media print{
+    .tabnav, .pdf-panel, .footer-actions, .extract-toggle, #extractPreview{ display:none !important; }
+    .split{ grid-template-columns:1fr; }
+    body{ padding:0; }
+    .toggle-btn, .reset-decision-btn{ display:none !important; }
+    .decision-cell .printed-decision{ display:block !important; }
+  }
+  .printed-decision{ display:none; font-weight:700; }
+
+  /* ---- Admin view ---- */
+  .admin-intro{ font-family:"Avenir Next","Segoe UI",system-ui,sans-serif; font-size:13px; color:var(--muted); margin-bottom:16px; max-width:70ch; }
+  .admin-group{ background:var(--panel); border:1px solid var(--line); border-left:4px solid var(--gold); border-radius:6px; padding:16px 18px; margin-bottom:18px; }
+  .admin-group label{ display:block; font-family:"Avenir Next","Segoe UI",system-ui,sans-serif; font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin:10px 0 4px; }
+  .admin-group input[type=text], .admin-group textarea{
+    width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:3px;
+    font-family:"Avenir Next","Segoe UI",system-ui,sans-serif; font-size:13.5px;
+  }
+  .admin-group textarea{ min-height:70px; resize:vertical; }
+  .admin-crit-row{ display:grid; grid-template-columns:90px 1fr auto; gap:8px; align-items:start; margin-bottom:8px; }
+  .admin-group-head{ display:flex; justify-content:space-between; align-items:center; }
+  .admin-group-head h3{ margin:0; font-size:16px; color:var(--navy-dark); }
+  .admin-actions{ display:flex; gap:12px; margin-top:6px; flex-wrap:wrap; }
+  .storage-note{ font-family:"Avenir Next","Segoe UI",system-ui,sans-serif; font-size:12px; color:var(--muted); margin-top:10px; }
+
+  /* ---- Resubmission / attempt history ---- */
+  .record-row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:12px; font-family:"Avenir Next","Segoe UI",system-ui,sans-serif; }
+  .load-btn{ background:#fff; color:var(--navy); border:1px solid var(--navy); font-weight:700; font-size:13px; padding:9px 14px; border-radius:4px; cursor:pointer; }
+  .load-btn:hover{ background:var(--gold-light); }
+  #recordInput{ display:none; }
+  .record-status{ font-size:12.5px; color:var(--muted); }
+  .record-status.active{ color:var(--achieved); font-weight:700; }
+  .attempt-badge{
+    display:inline-block; font-family:"Avenir Next","Segoe UI",system-ui,sans-serif; font-size:10.5px; font-weight:700;
+    text-transform:uppercase; letter-spacing:0.4px; padding:2px 7px; border-radius:10px; margin-bottom:6px;
+    background:var(--gold-light); color:#6b4e10; border:1px solid var(--gold);
+  }
+  .history-box{
+    background:#f5f3ea; border:1px solid var(--line); border-left:3px solid var(--notachieved);
+    border-radius:4px; padding:7px 9px; margin-bottom:8px; font-family:"Avenir Next","Segoe UI",system-ui,sans-serif;
+  }
+  .history-box .hist-label{ font-size:10.5px; text-transform:uppercase; letter-spacing:0.4px; color:var(--notachieved); font-weight:700; margin-bottom:3px; }
+  .history-box .hist-entry{ font-size:12px; color:var(--ink); margin-bottom:4px; white-space:pre-wrap; }
+  .history-box .hist-entry:last-child{ margin-bottom:0; }
+  .history-box .hist-meta{ font-size:10.5px; color:var(--muted); }
+  .locked-row{ opacity:0.85; }
+  .locked-note{
+    font-family:"Avenir Next","Segoe UI",system-ui,sans-serif; font-size:11px; color:var(--achieved);
+    display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:4px;
+  }
+  .reopen-link{ color:var(--navy); text-decoration:underline; cursor:pointer; font-size:11px; }
+  @media print{
+    .record-row{ display:none !important; }
+    .reopen-link{ display:none !important; }
+  }
+
+  /* ---- Learners view (bulk names + assignment PDFs) ---- */
+  .learners-grid{ display:flex; gap:20px; flex-wrap:wrap; margin-bottom:18px; }
+  .learners-grid > div{ flex:1; min-width:280px; }
+  .bulk-box textarea{
+    width:100%; min-height:140px; padding:10px; border:1px solid var(--line); border-radius:4px;
+    font-family:"Avenir Next","Segoe UI",system-ui,sans-serif; font-size:13px; resize:vertical;
+  }
+  .learner-list{ background:var(--panel); border:1px solid var(--line); border-radius:6px; overflow:hidden; }
+  .learner-row{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:9px 14px; border-top:1px solid var(--line); font-family:"Avenir Next","Segoe UI",system-ui,sans-serif; font-size:13px;
+  }
+  .learner-row:first-child{ border-top:none; }
+  .learner-row .lname{ font-weight:600; color:var(--navy-dark); cursor:pointer; border-bottom:1px dashed transparent; }
+  .learner-row .lname:hover{ border-bottom-color:var(--navy); }
+  .rename-input{
+    font-family:"Avenir Next","Segoe UI",system-ui,sans-serif; font-size:13px; font-weight:600;
+    padding:3px 6px; border:1px solid var(--navy); border-radius:3px; color:var(--navy-dark); min-width:140px;
+  }
+  .learner-row .lstatus{ font-size:11.5px; }
+  .learner-row .lstatus.yes{ color:var(--achieved); }
+  .learner-row .lstatus.no{ color:var(--muted); }
+  .learner-row .lactions{ display:flex; align-items:center; gap:10px; }
+  .learner-row .attach-link{ font-size:11.5px; color:var(--navy); text-decoration:underline; cursor:pointer; }
+  .learner-row input[type=file]{ display:none; }
+  .unmatched-note{
+    font-family:"Avenir Next","Segoe UI",system-ui,sans-serif; font-size:12px; color:var(--notachieved);
+    background:var(--notachieved-bg); border:1px solid var(--notachieved); border-radius:4px; padding:8px 10px; margin-top:8px; display:none;
+  }
+  .unmatched-note.info{ color:#6b4e10; background:var(--gold-light); border-color:var(--gold); }
+
+  /* ---- Startup password gate ---- */
+  .auth-gate{
+    position:fixed; inset:0; z-index:9999; display:flex; align-items:center; justify-content:center;
+    padding:24px; background:rgba(11,21,38,0.96);
+  }
+  .auth-card{
+    width:min(420px,100%); background:var(--panel); border:1px solid var(--gold); border-radius:8px;
+    padding:28px; box-shadow:0 18px 50px rgba(0,0,0,0.35); text-align:center;
+  }
+  .auth-card h2{ margin:0 0 8px; color:var(--navy-dark); font-size:22px; }
+  .auth-card p{ margin:0 0 18px; color:var(--muted); font-family:"Avenir Next","Segoe UI",system-ui,sans-serif; font-size:13px; }
+  .auth-card form{ display:flex; flex-direction:column; gap:10px; }
+  .auth-card input{ width:100%; padding:11px 12px; border:1px solid var(--line); border-radius:4px; font:14px "Avenir Next","Segoe UI",system-ui,sans-serif; }
+  .auth-card button{ padding:11px 16px; border:0; border-radius:4px; background:var(--navy); color:#fff; font:700 13px "Avenir Next","Segoe UI",system-ui,sans-serif; cursor:pointer; }
+  .auth-card button:hover{ background:var(--navy-dark); }
+  .auth-error{ min-height:18px; margin-top:8px; color:var(--notachieved); font:12px "Avenir Next","Segoe UI",system-ui,sans-serif; }
+</style>
+</head>
+<body>
+
+<div class="auth-gate" id="authGate">
+  <div class="auth-card">
+    <h2>Protected Assessment System</h2>
+    <p>Enter the password to open the learner assessment system.</p>
+    <form id="authForm" autocomplete="off">
+      <input id="systemPassword" type="password" placeholder="Password" aria-label="System password" required autofocus>
+      <button type="submit">Open system</button>
+    </form>
+    <div class="auth-error" id="authError" role="alert" aria-live="polite"></div>
+  </div>
+</div>
+
+<div class="masthead">
+  <h1>Strategic Human Resource Management</h1>
+  <div class="tag">Assessment Criteria Descriptor — Assisted Marking</div>
+</div>
+
+<div class="tabnav">
+  <button class="tab-btn active" data-view="markingView" id="tabMarking">Mark Assignment</button>
+  <button class="tab-btn" data-view="learnersView" id="tabLearners">Learners &amp; Assignments</button>
+  <button class="tab-btn" data-view="adminView" id="tabAdmin">Admin — Manage Criteria</button>
+</div>
+
+<!-- ===================== MARKING VIEW ===================== -->
+<div class="view active" id="markingView">
+
+  <div class="meta-row">
+    <div><label>Pick learner (from list)</label>
+      <select id="learnerPicker" style="width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:3px; font-family:'Avenir Next','Segoe UI',system-ui,sans-serif; font-size:14px; background:var(--panel);">
+        <option value="">— Type name manually below, or pick here —</option>
+      </select>
+    </div>
+    <div><label>Learner name</label><input type="text" id="learnerName" placeholder="e.g. J. Smith"></div>
+    <div><label>Assessor name</label><input type="text" id="assessorName" placeholder="e.g. A. Shaheen"></div>
+    <div><label>Date</label><input type="date" id="assessDate"></div>
+  </div>
+
+  <div class="record-row">
+    <button class="load-btn" id="loadRecordBtn" type="button">Load previous marking record (PDF, resubmission)</button>
+    <input type="file" id="recordInput" accept="application/pdf,application/json,.pdf,.json">
+    <span class="record-status" id="recordStatus">No previous record loaded — this is a first submission.</span>
+  </div>
+
+  <div class="split">
+
+    <div class="pdf-panel">
+      <div class="upload-row">
+        <button class="filebtn" id="pickFileBtn" type="button">Attach learner's assignment (PDF)</button>
+        <input type="file" id="fileInput" accept="application/pdf">
+      </div>
+      <div class="fname" id="fileName">No file attached</div>
+      <div class="status" id="uploadStatus"></div>
+      <div class="zoom-row">
+        <span class="zoom-btn" id="zoomOutBtn" title="Zoom out">&minus;</span>
+        <span class="zoom-label" id="zoomLabel">100%</span>
+        <span class="zoom-btn" id="zoomInBtn" title="Zoom in">+</span>
+        <span class="zoom-reset" id="zoomResetBtn">Reset</span>
+      </div>
+      <span class="extract-toggle" id="extractToggle" style="display:none;">Show extracted text (for search/copy)</span>
+      <div id="extractPreview"></div>
+      <div id="pdfPages"><div class="pdf-placeholder">Attach a PDF to read the learner's full assignment here, page by page, while you mark on the right.</div></div>
+    </div>
+
+    <div>
+      <div class="summary util" id="summaryBar" style="display:none;">
+        <span class="pill good" id="achievedPill">0 achieved</span>
+        <span class="pill bad" id="notachievedPill">0 not achieved</span>
+        <span class="pill" id="pendingPill">0 pending</span>
+      </div>
+
+      <div class="overall-box util" id="overallBox" style="display:none;">
+        <div class="overall-head">
+          <span class="overall-label">Overall assignment decision</span>
+          <span class="overall-value" id="overallValue">&mdash;</span>
+        </div>
+        <div class="overall-detail" id="overallDetail"></div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Learning outcome</th>
+            <th>Assessment criteria</th>
+            <th>Evidence<br>(To provide evidence of Achieving Assessment Criteria Learner should provide the following)</th>
+            <th>Assessor decision</th>
+            <th>Assessor comments</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+
+      <div class="footer-actions util">
+        <button class="print-btn" id="printBtn">Print / save as PDF</button>
+        <button class="save-btn" id="exportRecordBtn">Save marking record (PDF, for resubmission)</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===================== LEARNERS VIEW ===================== -->
+<div class="view" id="learnersView">
+  <div class="admin-intro">
+    Add the group's learner names in bulk, then attach each learner's assignment PDF once. On the "Mark Assignment"
+    tab, the assessor picks a name from the list and that learner's PDF loads automatically in the reading panel —
+    no need to hunt for the right file each time. If a PDF's filename doesn't match anyone in the list, it's still
+    added automatically using a name guessed from the file — click any name below to rename it if the guess isn't
+    right. The learner list and each learner's marking progress (decisions and comments) save automatically —
+    synced across machines if jsonbin.io is configured (see the script near the top of the file), otherwise saved
+    to this browser only. Attached PDFs are saved in this browser's durable storage and remain available after
+    refreshing the page or closing and reopening the system.
+  </div>
+
+  <div class="learners-grid">
+    <div class="bulk-box">
+      <label style="display:block; font-family:'Avenir Next','Segoe UI',system-ui,sans-serif; font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin-bottom:6px;">Paste learner names — one per line</label>
+      <textarea id="bulkNamesInput" placeholder="J. Smith&#10;A. Khaled&#10;M. Farouk"></textarea>
+      <div class="admin-actions util" style="margin-top:10px;">
+        <button class="add-btn" id="addNamesBtn">+ Add names to list</button>
+      </div>
+    </div>
+    <div class="bulk-box">
+      <label style="display:block; font-family:'Avenir Next','Segoe UI',system-ui,sans-serif; font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin-bottom:6px;">Bulk-attach assignment PDFs</label>
+      <div class="admin-intro" style="margin-bottom:8px;">
+        Select all learner PDFs at once. Files are matched to names automatically by filename (e.g. "J_Smith.pdf" matches "J. Smith") — anything that doesn't match can be attached manually below.
+      </div>
+      <button class="filebtn" id="bulkPdfBtn" type="button">Choose assignment PDFs</button>
+      <input type="file" id="bulkPdfInput" accept="application/pdf" multiple>
+      <div class="unmatched-note" id="unmatchedNote"></div>
+    </div>
+  </div>
+
+  <div class="learner-list util" id="learnerList"></div>
+</div>
+
+<!-- ===================== ADMIN VIEW ===================== -->
+<div class="view" id="adminView">
+  <div class="admin-intro">
+    Edit the learning outcomes, assessment criteria and evidence text used across every assignment marked in this system.
+    Changes apply as soon as you save, and are stored for everyone who opens this file.
+  </div>
+  <div id="adminGroups"></div>
+  <div class="admin-actions util">
+    <button class="add-btn" id="addGroupBtn">+ Add learning outcome</button>
+    <button class="save-btn" id="saveAdminBtn">Save changes</button>
+    <button class="reset-btn" id="resetAdminBtn">Reset to original criteria</button>
+  </div>
+  <div class="storage-note util" id="storageNote"></div>
+</div>
+
+<script>
+// ---------- Default assessment criteria (fallback / reset target) ----------
+const DEFAULT_CRITERIA = [
+  {
+    lo: "A. Understand strategic issues in human resource management (HRM)",
+    evidence: "This learning outcomes requires learners to engage with seminal and current literature where the focus is the broader contexts and principles of strategic HRM. It is expected that learners will engage with research that focuses on the broader, global HRM issues before investigating the issues faced by different sectors and organisations in their home country. Learners need to be able to critique arguments and premises identified in the literature and research if they are to fully appreciate the strategic principles and issues in a HRM context.",
+    items: [
+      { code:"A.1", text:"Assess current contexts and challenges for strategic HRM" },
+      { code:"A.2", text:"Critically discuss the relationship between an organisation's strategic objectives, organisational change and HRM" },
+      { code:"A.3", text:"Critically analyse the impact of globalisation on HRM" },
+    ]
+  },
+  {
+    lo: "B. Understand strategic HRM in practice",
+    evidence: "Building on the knowledge and understanding gained through learning outcome A, learners will explore the wider issues that impact on the practice of HR managers. It is anticipated that learners will explore each of the key considerations mentioned in this learning outcome, which could be supported through the use of an external analysis (such as PESTLE) and internal analysis (such as SWOT). Learners should be able to demonstrate an understanding of national as well as international regulations/laws that impact the management of human resources, using specific regulations/laws as part of their critical arguments.",
+    items: [
+      { code:"B.1", text:"Analyse the value of effective workforce planning to an organisation" },
+      { code:"B.2", text:"Evaluate the ethical and diversity challenges that can arise in strategic HRM" },
+      { code:"B.3", text:"Critically discuss performance management as a strategic HRM tool" },
+      { code:"B.4", text:"Analyse legal and regulatory requirements on HRM practice" },
+    ]
+  },
+  {
+    lo: "C. Understand the role of strategic HRM in delivering organisational strategies",
+    evidence: "To support the learner's ability to meet this outcome they could be directed to the knowledge gained from Unit 1: Developing Strategic Management and Leadership. This learning outcome requires learners to focus on an organisation's strategy and how HRM strategies support the achievements of strategic objectives. It is anticipated that learners will explore the development of HR strategies in light of current and emerging trends and how any changes to an HR strategy could have a positive or negative effect on an organisation's achievement of its strategic objectives. Learners need to demonstrate an ability to be critical.",
+    items: [
+      { code:"C.1", text:"Evaluate the value of an HR strategy to an organisation" },
+      { code:"C.2", text:"Analyse the relationship between organisational strategy and HR strategy" },
+      { code:"C.3", text:"Critically evaluate current and emerging HRM trends which could influence HR and organisational strategies" },
+    ]
+  },
+  {
+    lo: "D. Be able to review an organisation's management of its human resources",
+    evidence: "This learning outcome draws together all learning that has taken place in the previous learning outcomes by applying a learner's knowledge and understanding, alongside their ability to critique, to an organisation's strategic management of its human resources. The organisation can be real, or one supplied through a case study. Learners are advised to develop their response to the assessment for this learning outcome as they progress through the unit's other learning outcomes. As with all other learning outcomes, learners need to demonstrate an ability to be critical.",
+    items: [
+      { code:"D.1", text:"Critically review the HRM context of an organisation" },
+      { code:"D.2", text:"Critically evaluate the extent to which an organisation's human resources are being strategically managed" },
+      { code:"D.3", text:"Develop justified recommendations for how an organisation could improve its strategic HRM for both current and future requirements" },
+    ]
+  },
+];
+
+let CRITERIA = JSON.parse(JSON.stringify(DEFAULT_CRITERIA));
+let rowState = {};
+let learnerText = "";
+
+// ---------- Tab switching ----------
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.view).classList.add('active');
+  });
+});
+
+// ---------- Storage helpers ----------
+const STORAGE_KEY = 'shrm_criteria_config';
+
+// ---- jsonbin.io config (fill these in to sync data across different computers) ----
+// 1. Create a free account at https://jsonbin.io
+// 2. Create a new bin with initial content: {}
+// 3. Copy the Bin ID (from the bin's URL / dashboard) and your account's X-Master-Key
+//    (Account settings) below.
+// Note: this key gives full read/write access to your jsonbin bins. Anyone who has this
+// downloaded file can read that key from the page source — fine for a small internal tool
+// shared with trusted assessors, not for anything sensitive or public-facing. jsonbin also
+// stores everything as a single JSON document, so two people saving at the exact same moment
+// can occasionally overwrite each other — acceptable for light use, not built for heavy
+// concurrent editing.
+const JSONBIN_BIN_ID = "6a8ae164da38895dfe06b73f";
+const JSONBIN_API_KEY = "$2a$10$VF92modk2VYcQGdWNt1QFuzecQ9c7iZ49vbtvrx/A1vO8OQnz2DYq";
+const jsonbinConfigured = JSONBIN_BIN_ID && JSONBIN_API_KEY
+  && !JSONBIN_BIN_ID.includes('YOUR_JSONBIN_BIN_ID') && !JSONBIN_API_KEY.includes('YOUR_JSONBIN_API_KEY');
+const JSONBIN_BASE = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`;
+
+async function jsonbinFetchAll(){
+  const res = await fetch(`${JSONBIN_BASE}/latest`, {
+    headers: { 'X-Master-Key': JSONBIN_API_KEY }
+  });
+  if(!res.ok) throw new Error('jsonbin fetch failed: ' + res.status);
+  const data = await res.json();
+  return (data && data.record && typeof data.record === 'object') ? data.record : {};
+}
+async function jsonbinWriteAll(obj){
+  const res = await fetch(JSONBIN_BASE, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_API_KEY },
+    body: JSON.stringify(obj)
+  });
+  if(!res.ok) throw new Error('jsonbin write failed: ' + res.status);
+}
+
+const hasCloudStorage = typeof window.storage !== 'undefined' && window.storage;
+let hasLocalFallback = false;
+try{ localStorage.setItem('__shrm_test__','1'); localStorage.removeItem('__shrm_test__'); hasLocalFallback = true; }catch(e){ hasLocalFallback = false; }
+const hasStorage = jsonbinConfigured || hasCloudStorage || hasLocalFallback;
+
+// Storage wrapper, tried in this order:
+//  1. jsonbin.io (if configured above) — real sync across every machine using this file
+//  2. Claude's shared window.storage — only present when running live as a Claude artifact
+//  3. This browser's localStorage — only persists on this computer, in this browser
+async function storageGet(key, shared){
+  if(jsonbinConfigured){
+    const all = await jsonbinFetchAll();
+    if(!(key in all)) throw new Error('not found');
+    return { key, value: all[key], shared };
+  }
+  if(hasCloudStorage){
+    return await window.storage.get(key, shared);
+  }
+  if(hasLocalFallback){
+    const v = localStorage.getItem(key);
+    if(v === null) throw new Error('not found');
+    return { key, value: v, shared };
+  }
+  throw new Error('no storage available');
+}
+async function storageSet(key, value, shared){
+  if(jsonbinConfigured){
+    const all = await jsonbinFetchAll().catch(()=>({}));
+    all[key] = value;
+    await jsonbinWriteAll(all);
+    return { key, value, shared };
+  }
+  if(hasCloudStorage){
+    return await window.storage.set(key, value, shared);
+  }
+  if(hasLocalFallback){
+    localStorage.setItem(key, value);
+    return { key, value, shared };
+  }
+  return null;
+}
+async function storageDelete(key, shared){
+  if(jsonbinConfigured){
+    const all = await jsonbinFetchAll().catch(()=>({}));
+    delete all[key];
+    await jsonbinWriteAll(all);
+    return { key, deleted: true, shared };
+  }
+  if(hasCloudStorage){
+    return await window.storage.delete(key, shared);
+  }
+  if(hasLocalFallback){
+    localStorage.removeItem(key);
+    return { key, deleted: true, shared };
+  }
+  return null;
+}
+
+async function loadCriteriaFromStorage(){
+  if(!hasStorage) return;
+  try{
+    const result = await storageGet(STORAGE_KEY, true);
+    if(result && result.value){
+      CRITERIA = JSON.parse(result.value);
+    }
+  }catch(e){
+    // key doesn't exist yet — keep defaults
+  }
+}
+
+async function saveCriteriaToStorage(){
+  const note = document.getElementById('storageNote');
+  if(!hasStorage){
+    note.textContent = "Storage isn't available in this environment — changes will apply for this session only.";
+    note.style.color = "var(--notachieved)";
+    return;
+  }
+  try{
+    await storageSet(STORAGE_KEY, JSON.stringify(CRITERIA), true);
+    note.textContent = "Saved. These criteria now apply for everyone using this system.";
+    note.style.color = "var(--achieved)";
+  }catch(e){
+    note.textContent = "Could not save changes: " + e.message;
+    note.style.color = "var(--notachieved)";
+  }
+}
+
+// ---------- Build marking table ----------
+function renderMarkingTable(){
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = "";
+  rowState = {};
+  CRITERIA.forEach(group=>{
+    group.items.forEach((item, idx)=>{
+      rowState[item.code] = { decision:null, comment:"", history:[], locked:false };
+      const tr = document.createElement('tr');
+      if(idx===0) tr.className='lo-first';
+      tr.innerHTML = `
+        ${idx===0 ? `<td class="lo-cell" rowspan="${group.items.length}">${group.lo}</td>` : ``}
+        <td class="crit-cell"><strong>${item.code}</strong>: ${item.text}</td>
+        ${idx===0 ? `<td class="evidence-cell" rowspan="${group.items.length}">${group.evidence}</td>` : ``}
+        <td class="decision-cell">
+          <div class="toggle-group">
+            <span class="attempt-badge" id="attemptBadge-${item.code}" style="display:none;"></span>
+            <div class="history-box" id="history-${item.code}" style="display:none;"></div>
+            <button class="toggle-btn achieved" data-code="${item.code}" data-val="achieved">Achieved</button>
+            <button class="toggle-btn notachieved" data-code="${item.code}" data-val="notachieved">Not Achieved</button>
+            <button class="reset-decision-btn" data-code="${item.code}" type="button">Reset decision</button>
+            <span class="printed-decision" id="printed-${item.code}"></span>
+            <div class="locked-note" id="lockedNote-${item.code}" style="display:none;">
+              &#10003; Achieved previously — carried forward
+              <span class="reopen-link" data-code="${item.code}">change decision</span>
+            </div>
+          </div>
+        </td>
+        <td class="comment-cell"><textarea class="comment-box" id="comment-${item.code}" placeholder="Assessor comment..."></textarea></td>
+      `;
+      tbody.appendChild(tr);
+    });
+  });
+  document.getElementById('summaryBar').style.display = 'none';
+  const overallBox = document.getElementById('overallBox');
+  if(overallBox){ overallBox.style.display = 'none'; overallBox.classList.remove('is-achieved','is-notachieved','is-pending'); }
+  const statusEl = document.getElementById('recordStatus');
+  if(statusEl){
+    statusEl.textContent = "No previous record loaded — this is a first submission.";
+    statusEl.classList.remove('active');
+  }
+}
+
+// ---------- Resubmission history: show carried-forward comments / lock achieved rows ----------
+function refreshRowExtras(code){
+  const st = rowState[code];
+  if(!st) return;
+  const badge = document.getElementById(`attemptBadge-${code}`);
+  const histBox = document.getElementById(`history-${code}`);
+  const lockedNote = document.getElementById(`lockedNote-${code}`);
+  const toggleAch = document.querySelector(`.toggle-btn.achieved[data-code="${code}"]`);
+  const toggleNot = document.querySelector(`.toggle-btn.notachieved[data-code="${code}"]`);
+  const resetBtn = document.querySelector(`.reset-decision-btn[data-code="${code}"]`);
+  const commentBox = document.getElementById(`comment-${code}`);
+  if(!badge || !histBox || !lockedNote || !toggleAch || !toggleNot || !resetBtn || !commentBox) return;
+
+  const attemptNum = (st.history || []).length + 1;
+  if(st.history && st.history.length > 0){
+    badge.style.display = 'inline-block';
+    badge.textContent = `Attempt ${attemptNum}`;
+    histBox.style.display = 'block';
+    histBox.innerHTML = `<div class="hist-label">Previous assessor comment${st.history.length>1?'s':''}</div>` +
+      st.history.map((h,i)=>{
+        const label = h.decision==='achieved' ? 'Achieved' : 'Not Achieved';
+        const meta = [`Attempt ${i+1}`, label, h.date, h.assessor].filter(Boolean).join(' — ');
+        return `<div class="hist-entry">"${escapeHtml(h.comment || '(no comment left)')}"<div class="hist-meta">${meta}</div></div>`;
+      }).join('');
+  } else {
+    badge.style.display = 'none';
+    histBox.style.display = 'none';
+    histBox.innerHTML = '';
+  }
+
+  if(st.locked){
+    toggleAch.style.display = 'none';
+    toggleNot.style.display = 'none';
+    lockedNote.style.display = 'flex';
+    commentBox.disabled = true;
+  } else {
+    toggleAch.style.display = '';
+    toggleNot.style.display = '';
+    lockedNote.style.display = 'none';
+    commentBox.disabled = false;
+  }
+  resetBtn.style.display = (st.decision || st.locked) ? 'inline-block' : 'none';
+}
+
+function resetCriterionDecision(code){
+  const st = rowState[code];
+  if(!st) return;
+  st.decision = null;
+  st.locked = false;
+  document.querySelectorAll(`.toggle-btn[data-code="${code}"]`).forEach(b=>b.classList.remove('active'));
+  const printed = document.getElementById(`printed-${code}`);
+  if(printed) printed.textContent = '';
+  refreshRowExtras(code);
+  updateSummary();
+  scheduleSaveMarking();
+}
+
+document.getElementById('tableBody').addEventListener('click', (e)=>{
+  const reopen = e.target.closest('.reopen-link');
+  if(reopen){
+    resetCriterionDecision(reopen.dataset.code);
+    return;
+  }
+  const resetBtn = e.target.closest('.reset-decision-btn');
+  if(resetBtn){
+    resetCriterionDecision(resetBtn.dataset.code);
+    return;
+  }
+  const btn = e.target.closest('.toggle-btn');
+  if(!btn) return;
+  const code = btn.dataset.code;
+  const val = btn.dataset.val;
+  rowState[code].decision = val;
+  document.querySelectorAll(`.toggle-btn[data-code="${code}"]`).forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById(`printed-${code}`).textContent = val==='achieved' ? 'Achieved' : 'Not Achieved';
+  refreshRowExtras(code);
+  updateSummary();
+  scheduleSaveMarking();
+});
+document.getElementById('tableBody').addEventListener('input', (e)=>{
+  if(e.target.classList.contains('comment-box')){
+    const code = e.target.id.replace('comment-','');
+    rowState[code].comment = e.target.value;
+    scheduleSaveMarking();
+  }
+});
+
+function updateSummary(){
+  const codes = Object.keys(rowState);
+  const ach = codes.filter(c=>rowState[c].decision==='achieved').length;
+  const not = codes.filter(c=>rowState[c].decision==='notachieved').length;
+  const pend = codes.length - ach - not;
+  document.getElementById('summaryBar').style.display='flex';
+  document.getElementById('achievedPill').textContent = `${ach} achieved`;
+  document.getElementById('notachievedPill').textContent = `${not} not achieved`;
+  document.getElementById('pendingPill').textContent = `${pend} pending`;
+  updateOverallDecision();
+}
+
+// ---------- Overall assignment decision ----------
+// Rule: if one or more assessment criteria is marked "Not Achieved", the whole
+// assignment is Not Achieved, listing each failed AC's code + assessor comment,
+// with a note that the assignment needs resubmission. Otherwise, Achieved once
+// every criterion is Achieved, or Pending while any are still unmarked.
+function computeOverallDecision(){
+  const codes = Object.keys(rowState);
+  const failed = codes
+    .filter(c=>rowState[c].decision==='notachieved')
+    .map(c=>({ code:c, comment: (rowState[c].comment||'').trim() }));
+  if(failed.length > 0){
+    return { status:'notachieved', failed };
+  }
+  const allAchieved = codes.length>0 && codes.every(c=>rowState[c].decision==='achieved');
+  if(allAchieved) return { status:'achieved', failed:[] };
+  return { status:'pending', failed:[] };
+}
+
+function updateOverallDecision(){
+  const box = document.getElementById('overallBox');
+  const valueEl = document.getElementById('overallValue');
+  const detailEl = document.getElementById('overallDetail');
+  if(!box || !valueEl || !detailEl) return;
+  const result = computeOverallDecision();
+  box.style.display = 'block';
+  box.classList.remove('is-achieved','is-notachieved','is-pending');
+
+  if(result.status === 'notachieved'){
+    box.classList.add('is-notachieved');
+    valueEl.textContent = 'Not Achieved';
+    const items = result.failed.map(f=>
+      `<li><strong>${escapeHtml(f.code)}</strong>${f.comment ? ` — ${escapeHtml(f.comment)}` : ` — <em>(no assessor comment entered)</em>`}</li>`
+    ).join('');
+    detailEl.innerHTML =
+      `<div class="oa-note">This assignment is Not Achieved due to the following assessment criteria:</div>` +
+      `<ul>${items}</ul>` +
+      `<div class="oa-note" style="margin-top:8px;">This assignment requires resubmission.</div>`;
+  } else if(result.status === 'achieved'){
+    box.classList.add('is-achieved');
+    valueEl.textContent = 'Achieved';
+    detailEl.innerHTML = `All assessment criteria have been achieved.`;
+  } else {
+    box.classList.add('is-pending');
+    valueEl.textContent = 'Pending';
+    detailEl.innerHTML = `Overall decision will be determined once every assessment criterion has been marked.`;
+  }
+}
+
+// ---------- PDF upload: render full pages + extract text ----------
+pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+const pickFileBtn = document.getElementById('pickFileBtn');
+const fileInput = document.getElementById('fileInput');
+const fileNameEl = document.getElementById('fileName');
+const uploadStatus = document.getElementById('uploadStatus');
+const extractToggle = document.getElementById('extractToggle');
+const extractPreview = document.getElementById('extractPreview');
+const pdfPages = document.getElementById('pdfPages');
+
+pickFileBtn.addEventListener('click', ()=>fileInput.click());
+
+fileInput.addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const buf = await file.arrayBuffer();
+  await renderPdfFromArrayBuffer(buf, file.name);
+  const currentLearner = document.getElementById('learnerName').value.trim();
+  if(currentLearner){
+    learnerFiles[currentLearner] = { fileName:file.name, buffer:buf };
+    try{
+      await saveLearnerPdf(currentLearner, file.name, buf);
+      renderLearnerList();
+      uploadStatus.textContent += ' Saved for this learner.';
+    }catch(err){
+      uploadStatus.textContent += ' Warning: could not save this PDF permanently — ' + err.message;
+      uploadStatus.className = 'status err';
+    }
+  }
+  e.target.value = '';
+});
+
+// Renders a PDF (given as an ArrayBuffer) into the reading panel. Used both for manual
+// "Attach learner's assignment" uploads and for auto-loading a PDF picked from the Learners list.
+async function renderPdfFromArrayBuffer(buf, displayName){
+  fileNameEl.textContent = displayName || "Attached PDF";
+  uploadStatus.textContent = "Loading PDF...";
+  uploadStatus.className = "status";
+  pdfPages.innerHTML = `<div class="pdf-placeholder">Loading pages...</div>`;
+  try{
+    const pdf = await pdfjsLib.getDocument({data:buf.slice(0)}).promise;
+    pdfPages.innerHTML = "";
+    let text = "";
+    for(let i=1;i<=pdf.numPages;i++){
+      const page = await pdf.getPage(i);
+
+      // Render the full page as an image for the assessor to read
+      const viewport = page.getViewport({scale:1.3});
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      canvas.dataset.baseWidth = viewport.width;
+      canvas.dataset.baseHeight = viewport.height;
+      const ctx = canvas.getContext('2d');
+      await page.render({canvasContext:ctx, viewport}).promise;
+      const label = document.createElement('div');
+      label.className = 'page-label';
+      label.textContent = `Page ${i} of ${pdf.numPages}`;
+      pdfPages.appendChild(label);
+      pdfPages.appendChild(canvas);
+
+      // Extract text in parallel, for the optional search/copy panel
+      const content = await page.getTextContent();
+      text += content.items.map(it=>it.str).join(" ") + "\n\n";
+    }
+    learnerText = text.trim();
+    uploadStatus.textContent = `Loaded ${pdf.numPages} page(s).`;
+    if(learnerText.length < 40){
+      uploadStatus.textContent += " Note: little extractable text found (may be a scanned/image PDF) — read the pages above directly.";
+      uploadStatus.className = "status err";
+    }
+    extractToggle.style.display = "inline-block";
+    extractPreview.textContent = learnerText.slice(0,6000) + (learnerText.length>6000 ? "\n\n[...truncated preview...]" : "");
+    applyZoom();
+  }catch(err){
+    uploadStatus.textContent = "Could not read this PDF: " + err.message;
+    uploadStatus.className = "status err";
+    pdfPages.innerHTML = `<div class="pdf-placeholder">Could not display this file.</div>`;
+  }
+}
+
+extractToggle.addEventListener('click', ()=>{
+  const showing = extractPreview.style.display === 'block';
+  extractPreview.style.display = showing ? 'none' : 'block';
+  extractToggle.textContent = showing ? 'Show extracted text (for search/copy)' : 'Hide extracted text';
+});
+
+// ---------- Zoom controls for the PDF reading panel ----------
+let pdfZoom = 1.0;
+function applyZoom(){
+  document.querySelectorAll('#pdfPages canvas').forEach(c=>{
+    const bw = parseFloat(c.dataset.baseWidth);
+    const bh = parseFloat(c.dataset.baseHeight);
+    if(!bw || !bh) return;
+    c.style.width = (bw * pdfZoom) + 'px';
+    c.style.height = (bh * pdfZoom) + 'px';
+  });
+  document.getElementById('zoomLabel').textContent = Math.round(pdfZoom*100) + '%';
+}
+document.getElementById('zoomInBtn').addEventListener('click', ()=>{
+  pdfZoom = Math.min(pdfZoom + 0.15, 3);
+  applyZoom();
+});
+document.getElementById('zoomOutBtn').addEventListener('click', ()=>{
+  pdfZoom = Math.max(pdfZoom - 0.15, 0.4);
+  applyZoom();
+});
+document.getElementById('zoomResetBtn').addEventListener('click', ()=>{
+  pdfZoom = 1.0;
+  applyZoom();
+});
+
+document.getElementById('printBtn').addEventListener('click', ()=>window.print());
+
+// ---------- Save / load marking records (for resubmission workflow) ----------
+// The record is saved as a real, human-readable PDF (so it's easy to open and file away),
+// with the structured marking data embedded invisibly at the end of the file so this same
+// PDF can be re-loaded later via "Load previous marking record" to drive the resubmission view.
+const DECISION_LABEL = { achieved:'Achieved', notachieved:'Not Achieved' };
+const RECORD_MARK_START = '%%SHRM_RECORD_START%%';
+const RECORD_MARK_END = '%%SHRM_RECORD_END%%';
+
+document.getElementById('exportRecordBtn').addEventListener('click', async ()=>{
+  const learner = document.getElementById('learnerName').value.trim();
+  if(!learner){ alert('Enter the learner name before saving a marking record.'); return; }
+  const assessor = document.getElementById('assessorName').value.trim();
+  const date = document.getElementById('assessDate').value;
+
+  const record = {
+    learnerName: learner,
+    assessorName: assessor,
+    date: date,
+    exportedAt: new Date().toISOString(),
+    criteria: {}
+  };
+  Object.keys(rowState).forEach(code=>{
+    const st = rowState[code];
+    record.criteria[code] = {
+      decision: st.decision,
+      comment: st.comment,
+      history: st.history || []
+    };
+  });
+
+  // Build a plain, readable PDF summary of the record
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'pt', format:'a4' });
+  const marginX = 44, pageBottom = 780;
+  let y = 54;
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(16);
+  doc.text('SHRM Assessment — Marking Record', marginX, y); y += 24;
+  doc.setFont('helvetica','normal'); doc.setFontSize(11);
+  doc.text(`Learner: ${learner}`, marginX, y); y += 15;
+  doc.text(`Assessor: ${assessor || '-'}`, marginX, y); y += 15;
+  doc.text(`Date: ${date || '-'}`, marginX, y); y += 15;
+  doc.text(`Saved: ${new Date().toLocaleString()}`, marginX, y); y += 22;
+
+  const failedCodes = Object.keys(record.criteria).filter(c=>record.criteria[c].decision==='notachieved');
+  const allDecided = Object.keys(record.criteria).length>0 && Object.keys(record.criteria).every(c=>record.criteria[c].decision);
+  const overallLabel = failedCodes.length>0 ? 'NOT ACHIEVED' : (allDecided ? 'ACHIEVED' : 'PENDING');
+  doc.setFont('helvetica','bold'); doc.setFontSize(13);
+  doc.text(`Overall assignment decision: ${overallLabel}`, marginX, y); y += 16;
+  if(failedCodes.length>0){
+    doc.setFont('helvetica','normal'); doc.setFontSize(10);
+    const reasonLines = doc.splitTextToSize(
+      `Not Achieved due to: ${failedCodes.map(c=>`${c} (${record.criteria[c].comment || 'no comment entered'})`).join('; ')}`,
+      500
+    );
+    reasonLines.forEach(line=>{
+      if(y > pageBottom){ doc.addPage(); y = 54; }
+      doc.text(line, marginX, y); y += 13;
+    });
+    doc.setFont('helvetica','bold'); doc.setFontSize(10.5);
+    doc.text('This assignment requires resubmission.', marginX, y); y += 15;
+  }
+  y += 6;
+  doc.setDrawColor(184,137,43); doc.line(marginX, y, 551, y); y += 20;
+
+  Object.keys(record.criteria).forEach(code=>{
+    const c = record.criteria[code];
+    const label = DECISION_LABEL[c.decision] || 'Pending';
+    if(y > pageBottom){ doc.addPage(); y = 54; }
+    doc.setFont('helvetica','bold'); doc.setFontSize(11.5);
+    doc.text(`${code} — ${label}`, marginX, y); y += 15;
+
+    doc.setFont('helvetica','normal'); doc.setFontSize(10);
+    const commentLines = doc.splitTextToSize(`Comment: ${c.comment || '(none)'}`, 500);
+    commentLines.forEach(line=>{
+      if(y > pageBottom){ doc.addPage(); y = 54; }
+      doc.text(line, marginX + 10, y); y += 13;
+    });
+
+    (c.history || []).forEach((h,i)=>{
+      if(y > pageBottom){ doc.addPage(); y = 54; }
+      doc.setFont('helvetica','italic'); doc.setFontSize(9);
+      const meta = [`Attempt ${i+1}`, DECISION_LABEL[h.decision] || h.decision, h.date, h.assessor].filter(Boolean).join(' — ');
+      const histLines = doc.splitTextToSize(`${meta}: ${h.comment || '(no comment left)'}`, 480);
+      histLines.forEach(line=>{
+        if(y > pageBottom){ doc.addPage(); y = 54; }
+        doc.text(line, marginX + 16, y); y += 12;
+      });
+    });
+    y += 8;
+  });
+
+  if(y > pageBottom - 40){ doc.addPage(); y = 54; }
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(150);
+  doc.text('This PDF holds an embedded data record used by the SHRM Assessment Tool to support marking a resubmission. It can be re-loaded with "Load previous marking record".', marginX, pageBottom + 10, { maxWidth: 500 });
+
+  // Embed the structured record as trailing text after the PDF's own data (ignored by PDF viewers,
+  // read back by this tool's loader).
+  const pdfBytes = doc.output('arraybuffer');
+  const markerText = `\n${RECORD_MARK_START}\n${JSON.stringify(record)}\n${RECORD_MARK_END}\n`;
+  const markerBytes = new TextEncoder().encode(markerText);
+  const combined = new Uint8Array(pdfBytes.byteLength + markerBytes.length);
+  combined.set(new Uint8Array(pdfBytes), 0);
+  combined.set(markerBytes, pdfBytes.byteLength);
+
+  const blob = new Blob([combined], { type:'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const safeName = learner.replace(/[^a-z0-9]+/gi,'_').replace(/^_+|_+$/g,'') || 'learner';
+  a.href = url;
+  a.download = `SHRM_marking_${safeName}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+});
+
+const loadRecordBtn = document.getElementById('loadRecordBtn');
+const recordInput = document.getElementById('recordInput');
+loadRecordBtn.addEventListener('click', ()=>recordInput.click());
+
+recordInput.addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  try{
+    const text = await file.text();
+    let record;
+    try{
+      // Older exports were plain .json files
+      record = JSON.parse(text);
+    }catch(_jsonErr){
+      const m = text.match(new RegExp(RECORD_MARK_START + '\\s*([\\s\\S]*?)\\s*' + RECORD_MARK_END));
+      if(!m) throw new Error('No marking record data found in this file. Make sure you are loading a file saved with the "Save marking record" button.');
+      record = JSON.parse(m[1]);
+    }
+    applyLoadedRecord(record);
+  }catch(err){
+    alert('Could not read this file as a marking record: ' + err.message);
+  }
+  e.target.value = '';
+});
+
+function applyLoadedRecord(record){
+  if(!record || typeof record !== 'object' || !record.criteria){
+    alert('This does not look like a valid marking record file.');
+    return;
+  }
+  if(record.learnerName) document.getElementById('learnerName').value = record.learnerName;
+
+  let matched = 0;
+  Object.keys(record.criteria).forEach(code=>{
+    if(!rowState[code]) return; // this criterion no longer exists in the current template
+    matched++;
+    const rec = record.criteria[code] || {};
+    let history = Array.isArray(rec.history) ? rec.history.slice() : [];
+    if(rec.decision){
+      history.push({
+        decision: rec.decision,
+        comment: rec.comment || '',
+        date: record.date || '',
+        assessor: record.assessorName || ''
+      });
+    }
+    rowState[code].history = history;
+
+    const commentBox = document.getElementById(`comment-${code}`);
+    if(rec.decision === 'achieved'){
+      // Already achieved last time — carry forward and lock; assessor can reopen if needed.
+      rowState[code].decision = 'achieved';
+      rowState[code].comment = rec.comment || '';
+      rowState[code].locked = true;
+      commentBox.value = rowState[code].comment;
+      document.querySelectorAll(`.toggle-btn[data-code="${code}"]`).forEach(b=>b.classList.remove('active'));
+      document.querySelector(`.toggle-btn.achieved[data-code="${code}"]`).classList.add('active');
+      document.getElementById(`printed-${code}`).textContent = 'Achieved';
+    } else {
+      // Not achieved (or never marked) — open it up for a fresh decision on the resubmission.
+      rowState[code].decision = null;
+      rowState[code].comment = '';
+      rowState[code].locked = false;
+      commentBox.value = '';
+      document.querySelectorAll(`.toggle-btn[data-code="${code}"]`).forEach(b=>b.classList.remove('active'));
+      document.getElementById(`printed-${code}`).textContent = '';
+    }
+    refreshRowExtras(code);
+  });
+
+  const statusEl = document.getElementById('recordStatus');
+  if(matched === 0){
+    statusEl.textContent = "Couldn't match this record to the current criteria — nothing was loaded.";
+    statusEl.classList.remove('active');
+  } else {
+    statusEl.textContent = `Loaded previous record for ${record.learnerName || 'this learner'} — mark the resubmission below. Criteria already achieved are carried forward; criteria marked "Not Achieved" show the previous comment and are open for a new decision.`;
+    statusEl.classList.add('active');
+    lastLoadedMarkingName = (record.learnerName || document.getElementById('learnerName').value || '').trim();
+    scheduleSaveMarking();
+  }
+  updateSummary();
+}
+
+// ---------- Admin: edit / add learning outcomes & criteria ----------
+function renderAdminForm(){
+  const container = document.getElementById('adminGroups');
+  container.innerHTML = "";
+  CRITERIA.forEach((group, gi)=>{
+    const div = document.createElement('div');
+    div.className = 'admin-group';
+    div.innerHTML = `
+      <div class="admin-group-head">
+        <h3>Learning outcome ${gi+1}</h3>
+        <button class="remove-btn" data-action="remove-group" data-gi="${gi}">Remove outcome</button>
+      </div>
+      <label>Learning outcome title</label>
+      <input type="text" data-action="lo-title" data-gi="${gi}" value="${escapeAttr(group.lo)}">
+      <label>Evidence required (exact wording shown to assessors)</label>
+      <textarea data-action="lo-evidence" data-gi="${gi}">${escapeHtml(group.evidence)}</textarea>
+      <label>Assessment criteria</label>
+      <div class="crit-list" data-gi="${gi}">
+        ${group.items.map((item,ii)=>`
+          <div class="admin-crit-row">
+            <input type="text" data-action="crit-code" data-gi="${gi}" data-ii="${ii}" value="${escapeAttr(item.code)}" placeholder="Code">
+            <input type="text" data-action="crit-text" data-gi="${gi}" data-ii="${ii}" value="${escapeAttr(item.text)}" placeholder="Criterion text">
+            <button class="remove-btn" data-action="remove-crit" data-gi="${gi}" data-ii="${ii}">Remove</button>
+          </div>
+        `).join('')}
+      </div>
+      <button class="add-btn" data-action="add-crit" data-gi="${gi}" style="margin-top:6px;">+ Add criterion</button>
+    `;
+    container.appendChild(div);
+  });
+}
+
+function escapeHtml(s){ return (s||"").replace(/[&<>]/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;' }[c])); }
+function escapeAttr(s){ return escapeHtml(s).replace(/"/g,'&quot;'); }
+
+document.getElementById('adminGroups').addEventListener('input', (e)=>{
+  const t = e.target;
+  const action = t.dataset.action;
+  if(!action) return;
+  const gi = parseInt(t.dataset.gi);
+  if(action==='lo-title') CRITERIA[gi].lo = t.value;
+  if(action==='lo-evidence') CRITERIA[gi].evidence = t.value;
+  if(action==='crit-code') CRITERIA[gi].items[parseInt(t.dataset.ii)].code = t.value;
+  if(action==='crit-text') CRITERIA[gi].items[parseInt(t.dataset.ii)].text = t.value;
+});
+
+document.getElementById('adminGroups').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-action]');
+  if(!btn) return;
+  const action = btn.dataset.action;
+  const gi = parseInt(btn.dataset.gi);
+  if(action==='remove-group'){
+    if(CRITERIA.length<=1){ alert("At least one learning outcome is required."); return; }
+    CRITERIA.splice(gi,1);
+  }
+  if(action==='add-crit'){
+    CRITERIA[gi].items.push({code:"NEW", text:""});
+  }
+  if(action==='remove-crit'){
+    const ii = parseInt(btn.dataset.ii);
+    if(CRITERIA[gi].items.length<=1){ alert("Each learning outcome needs at least one criterion."); return; }
+    CRITERIA[gi].items.splice(ii,1);
+  }
+  renderAdminForm();
+});
+
+document.getElementById('addGroupBtn').addEventListener('click', ()=>{
+  CRITERIA.push({
+    lo: "New learning outcome",
+    evidence: "",
+    items: [{code:"X.1", text:"New criterion"}]
+  });
+  renderAdminForm();
+});
+
+document.getElementById('saveAdminBtn').addEventListener('click', async ()=>{
+  await saveCriteriaToStorage();
+  renderMarkingTable();
+});
+
+document.getElementById('resetAdminBtn').addEventListener('click', async ()=>{
+  if(!confirm("Reset all learning outcomes and criteria to the original descriptor? This discards custom edits.")) return;
+  CRITERIA = JSON.parse(JSON.stringify(DEFAULT_CRITERIA));
+  renderAdminForm();
+  await saveCriteriaToStorage();
+  renderMarkingTable();
+});
+
+// ---------- Learners: bulk names + bulk-attached assignment PDFs ----------
+let learners = [];          // ordered list of learner names
+let learnerFiles = {};      // name -> { fileName, buffer: ArrayBuffer } (hydrated from IndexedDB)
+
+function normalizeName(s){
+  return (s||"").toLowerCase().replace(/[^a-z0-9]/g,"");
+}
+
+// ---------- Durable PDF storage ----------
+// PDFs are binary files and can exceed localStorage's small quota, so they are stored
+// in IndexedDB. This survives page refreshes and closing/reopening the browser/system.
+const PDF_DB_NAME = 'shrm_assignment_pdf_store';
+const PDF_DB_VERSION = 1;
+const PDF_STORE_NAME = 'learner_pdfs';
+let pdfDbPromise = null;
+
+function openPdfDb(){
+  if(pdfDbPromise) return pdfDbPromise;
+  if(!('indexedDB' in window)) return Promise.reject(new Error('IndexedDB is not available in this browser.'));
+  pdfDbPromise = new Promise((resolve, reject)=>{
+    const request = indexedDB.open(PDF_DB_NAME, PDF_DB_VERSION);
+    request.onupgradeneeded = ()=>{
+      const db = request.result;
+      if(!db.objectStoreNames.contains(PDF_STORE_NAME)) db.createObjectStore(PDF_STORE_NAME, { keyPath:'id' });
+    };
+    request.onsuccess = ()=>resolve(request.result);
+    request.onerror = ()=>reject(request.error || new Error('Could not open PDF storage.'));
+  });
+  return pdfDbPromise;
+}
+
+async function saveLearnerPdf(name, fileName, buffer){
+  const db = await openPdfDb();
+  await new Promise((resolve, reject)=>{
+    const tx = db.transaction(PDF_STORE_NAME, 'readwrite');
+    tx.objectStore(PDF_STORE_NAME).put({ id:normalizeName(name), learnerName:name, fileName, buffer:buffer.slice(0) });
+    tx.oncomplete = resolve;
+    tx.onerror = ()=>reject(tx.error || new Error('Could not save the PDF.'));
+    tx.onabort = ()=>reject(tx.error || new Error('Could not save the PDF.'));
+  });
+}
+
+async function loadLearnerPdf(name){
+  const db = await openPdfDb();
+  return await new Promise((resolve, reject)=>{
+    const tx = db.transaction(PDF_STORE_NAME, 'readonly');
+    const request = tx.objectStore(PDF_STORE_NAME).get(normalizeName(name));
+    request.onsuccess = ()=>resolve(request.result || null);
+    request.onerror = ()=>reject(request.error || new Error('Could not load the PDF.'));
+  });
+}
+
+async function loadAllLearnerPdfs(){
+  try{
+    const db = await openPdfDb();
+    const records = await new Promise((resolve, reject)=>{
+      const tx = db.transaction(PDF_STORE_NAME, 'readonly');
+      const request = tx.objectStore(PDF_STORE_NAME).getAll();
+      request.onsuccess = ()=>resolve(request.result || []);
+      request.onerror = ()=>reject(request.error || new Error('Could not load saved PDFs.'));
+    });
+    records.forEach(record=>{
+      if(record && record.learnerName && record.buffer) learnerFiles[record.learnerName] = { fileName:record.fileName, buffer:record.buffer };
+    });
+  }catch(e){
+    console.warn('Durable PDF storage is unavailable:', e);
+  }
+}
+
+async function deleteLearnerPdf(name){
+  try{
+    const db = await openPdfDb();
+    await new Promise((resolve, reject)=>{
+      const tx = db.transaction(PDF_STORE_NAME, 'readwrite');
+      tx.objectStore(PDF_STORE_NAME).delete(normalizeName(name));
+      tx.oncomplete = resolve;
+      tx.onerror = ()=>reject(tx.error || new Error('Could not remove the PDF.'));
+      tx.onabort = ()=>reject(tx.error || new Error('Could not remove the PDF.'));
+    });
+  }catch(e){ console.warn('Could not remove saved PDF:', e); }
+}
+
+async function renameLearnerPdf(oldName, newName){
+  const record = await loadLearnerPdf(oldName).catch(()=>null);
+  if(!record) return;
+  await saveLearnerPdf(newName, record.fileName, record.buffer);
+  await deleteLearnerPdf(oldName);
+}
+
+// ---------- Persistence: learner list + per-learner marking progress ----------
+// Both are stored as shared data, so everyone who opens this file sees the same
+// learner list and the same marking decisions/comments for each learner.
+const LEARNERS_KEY = 'shrm_learners_list';
+function markingKey(name){ return 'shrm_marking:' + normalizeName(name); }
+
+async function loadLearnersFromStorage(){
+  if(!hasStorage) return;
+  try{
+    const result = await storageGet(LEARNERS_KEY, true);
+    if(result && result.value){
+      const arr = JSON.parse(result.value);
+      if(Array.isArray(arr)) learners = arr;
+    }
+  }catch(e){ /* nothing saved yet */ }
+}
+
+async function saveLearnersToStorage(){
+  if(!hasStorage) return;
+  try{
+    await storageSet(LEARNERS_KEY, JSON.stringify(learners), true);
+  }catch(e){ /* ignore — non-critical */ }
+}
+
+function buildMarkingSnapshot(name){
+  const snapshot = {
+    learnerName: name,
+    assessorName: document.getElementById('assessorName').value.trim(),
+    date: document.getElementById('assessDate').value,
+    savedAt: new Date().toISOString(),
+    criteria: {}
+  };
+  Object.keys(rowState).forEach(code=>{
+    const st = rowState[code];
+    snapshot.criteria[code] = { decision: st.decision, comment: st.comment, history: st.history || [], locked: !!st.locked };
+  });
+  return snapshot;
+}
+
+async function saveMarkingForLearner(name){
+  if(!hasStorage || !name) return;
+  try{
+    await storageSet(markingKey(name), JSON.stringify(buildMarkingSnapshot(name)), true);
+  }catch(e){ /* ignore — non-critical */ }
+}
+
+let saveMarkingTimer = null;
+function scheduleSaveMarking(){
+  const name = document.getElementById('learnerName').value.trim();
+  if(!name) return;
+  clearTimeout(saveMarkingTimer);
+  saveMarkingTimer = setTimeout(()=>saveMarkingForLearner(name), 500);
+}
+
+async function loadMarkingForLearner(name){
+  if(!hasStorage || !name) return false;
+  try{
+    const result = await storageGet(markingKey(name), true);
+    if(!result || !result.value) return false;
+    const snap = JSON.parse(result.value);
+    if(snap.assessorName) document.getElementById('assessorName').value = snap.assessorName;
+    if(snap.date) document.getElementById('assessDate').value = snap.date;
+    Object.keys(snap.criteria || {}).forEach(code=>{
+      if(!rowState[code]) return; // criterion no longer exists in current template
+      const c = snap.criteria[code];
+      rowState[code].decision = c.decision || null;
+      rowState[code].comment = c.comment || '';
+      rowState[code].history = c.history || [];
+      rowState[code].locked = !!c.locked;
+      const commentBox = document.getElementById(`comment-${code}`);
+      if(commentBox) commentBox.value = rowState[code].comment;
+      document.querySelectorAll(`.toggle-btn[data-code="${code}"]`).forEach(b=>b.classList.remove('active'));
+      if(rowState[code].decision){
+        const activeBtn = document.querySelector(`.toggle-btn.${rowState[code].decision}[data-code="${code}"]`);
+        if(activeBtn) activeBtn.classList.add('active');
+        document.getElementById(`printed-${code}`).textContent = DECISION_LABEL[rowState[code].decision] || '';
+      } else {
+        document.getElementById(`printed-${code}`).textContent = '';
+      }
+      refreshRowExtras(code);
+    });
+    updateSummary();
+    const statusEl = document.getElementById('recordStatus');
+    if(statusEl){
+      statusEl.textContent = `Restored saved marking progress for ${name}.`;
+      statusEl.classList.add('active');
+    }
+    return true;
+  }catch(e){
+    return false;
+  }
+}
+
+// Tracks whose marking data is currently loaded into the table, so we know when to
+// flush-save outgoing data and load incoming data as the assessor switches learners.
+let lastLoadedMarkingName = "";
+async function switchMarkingLearner(name){
+  name = (name || "").trim();
+  if(name === lastLoadedMarkingName) return;
+  if(lastLoadedMarkingName) await saveMarkingForLearner(lastLoadedMarkingName);
+  renderMarkingTable();
+  document.getElementById('learnerName').value = name;
+  lastLoadedMarkingName = name;
+  if(name) await loadMarkingForLearner(name);
+}
+
+document.getElementById('learnerName').addEventListener('blur', (e)=>{
+  const name = e.target.value.trim();
+  if(name && name !== lastLoadedMarkingName){
+    switchMarkingLearner(name);
+  }
+});
+document.getElementById('assessorName').addEventListener('input', scheduleSaveMarking);
+document.getElementById('assessDate').addEventListener('change', scheduleSaveMarking);
+
+function renderLearnerList(){
+  const listEl = document.getElementById('learnerList');
+  const picker = document.getElementById('learnerPicker');
+  const currentPicked = picker.value;
+
+  if(learners.length === 0){
+    listEl.innerHTML = `<div class="learner-row"><span class="lname" style="font-weight:400; color:var(--muted);">No learners added yet — paste names on the left to get started.</span></div>`;
+  } else {
+    listEl.innerHTML = learners.map(name=>{
+      const has = !!learnerFiles[name];
+      return `
+        <div class="learner-row">
+          <span class="lname">${escapeHtml(name)}</span>
+          <div class="lactions">
+            <span class="lstatus ${has ? 'yes' : 'no'}">${has ? '✓ PDF attached ('+escapeHtml(learnerFiles[name].fileName)+')' : 'No PDF attached'}</span>
+            <span class="attach-link" data-action="attach-one" data-name="${escapeAttr(name)}">${has ? 'Replace PDF' : 'Attach PDF'}</span>
+            <span class="attach-link" data-action="remove-learner" data-name="${escapeAttr(name)}" style="color:var(--notachieved);">Remove</span>
+            <input type="file" accept="application/pdf" data-name="${escapeAttr(name)}" class="single-pdf-input">
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  // Rebuild the picker dropdown on the Marking tab
+  picker.innerHTML = `<option value="">— Type name manually below, or pick here —</option>` +
+    learners.map(n=>`<option value="${escapeAttr(n)}">${escapeHtml(n)}${learnerFiles[n] ? ' (PDF attached)' : ''}</option>`).join('');
+  if(learners.includes(currentPicked)) picker.value = currentPicked;
+}
+
+document.getElementById('addNamesBtn').addEventListener('click', ()=>{
+  const raw = document.getElementById('bulkNamesInput').value;
+  const incoming = raw.split('\n').map(s=>s.trim()).filter(Boolean);
+  const existingNorm = new Set(learners.map(normalizeName));
+  let added = 0;
+  incoming.forEach(name=>{
+    const norm = normalizeName(name);
+    if(!norm || existingNorm.has(norm)) return;
+    learners.push(name);
+    existingNorm.add(norm);
+    added++;
+  });
+  document.getElementById('bulkNamesInput').value = "";
+  renderLearnerList();
+  saveLearnersToStorage();
+  if(added === 0 && incoming.length > 0){
+    alert("Those names are already in the list.");
+  }
+});
+
+function cleanNameFromFilename(baseName){
+  let s = baseName.replace(/[_\-]+/g, ' ');
+  const stopWords = /\b(shrm|assignment|assignments|final|submission|resubmission|resub|draft|copy|report|coursework|hrm|v\d+|version\s*\d+)\b/gi;
+  s = s.replace(stopWords, ' ');
+  s = s.replace(/\s{2,}/g, ' ').trim();
+  s = s.split(' ').map(w=>{
+    if(/^[a-z]+$/.test(w) || /^[A-Z]+$/.test(w)) return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+    return w;
+  }).join(' ');
+  return s || baseName;
+}
+
+const bulkPdfBtn = document.getElementById('bulkPdfBtn');
+const bulkPdfInput = document.getElementById('bulkPdfInput');
+bulkPdfBtn.addEventListener('click', ()=>bulkPdfInput.click());
+
+bulkPdfInput.addEventListener('change', async (e)=>{
+  const files = Array.from(e.target.files || []);
+  if(files.length === 0) return;
+  const matchedNames = [];
+  const autoAddedNames = [];
+  for(const file of files){
+    const baseName = file.name.replace(/\.[^.]+$/, "");
+    const normFile = normalizeName(baseName);
+    let match = learners.find(n=>normalizeName(n) === normFile);
+    if(!match){
+      match = learners.find(n=>{
+        const nn = normalizeName(n);
+        return nn.length>2 && (normFile.includes(nn) || nn.includes(normFile));
+      });
+    }
+    const buf = await file.arrayBuffer();
+    if(match){
+      learnerFiles[match] = { fileName: file.name, buffer: buf };
+      await saveLearnerPdf(match, file.name, buf);
+      matchedNames.push(match);
+    } else {
+      // No name in the list matched this file — add a new learner using a cleaned-up
+      // guess of their name from the filename, so nothing gets lost. Rename it by
+      // clicking the name in the list below if the guess isn't quite right.
+      let guess = cleanNameFromFilename(baseName);
+      let finalName = guess;
+      let n = 2;
+      while(learners.some(l=>normalizeName(l) === normalizeName(finalName))){
+        finalName = `${guess} (${n})`; n++;
+      }
+      learners.push(finalName);
+      learnerFiles[finalName] = { fileName: file.name, buffer: buf };
+      await saveLearnerPdf(finalName, file.name, buf);
+      autoAddedNames.push(finalName);
+    }
+  }
+  const note = document.getElementById('unmatchedNote');
+  if(autoAddedNames.length){
+    note.style.display = 'block';
+    note.className = 'unmatched-note info';
+    note.textContent = `Added ${autoAddedNames.length} new learner(s) from filenames that didn't match anyone in the list: ${autoAddedNames.join(', ')}. Click a name below to rename it if the guess isn't quite right.`;
+  } else {
+    note.style.display = 'none';
+  }
+  bulkPdfInput.value = '';
+  renderLearnerList();
+  if(autoAddedNames.length) saveLearnersToStorage();
+});
+
+document.getElementById('learnerList').addEventListener('change', async (e)=>{
+  if(!e.target.classList.contains('single-pdf-input')) return;
+  const name = e.target.dataset.name;
+  const file = e.target.files[0];
+  if(!file) return;
+  const buf = await file.arrayBuffer();
+  learnerFiles[name] = { fileName: file.name, buffer: buf };
+  try{
+    await saveLearnerPdf(name, file.name, buf);
+  }catch(err){
+    alert('The PDF was loaded for this session, but could not be saved permanently: ' + err.message);
+  }
+  renderLearnerList();
+});
+
+document.getElementById('learnerList').addEventListener('click', (e)=>{
+  const nameSpan = e.target.closest('.lname');
+  if(nameSpan){
+    startRenameLearner(nameSpan);
+    return;
+  }
+  const btn = e.target.closest('[data-action]');
+  if(!btn) return;
+  const action = btn.dataset.action;
+  const name = btn.dataset.name;
+  if(action === 'attach-one'){
+    const input = document.querySelector(`.single-pdf-input[data-name="${CSS.escape(name)}"]`);
+    if(input) input.click();
+  }
+  if(action === 'remove-learner'){
+    if(!confirm(`Remove ${name} from the learner list? Their attached PDF and saved marking progress will also be removed.`)) return;
+    learners = learners.filter(n=>n!==name);
+    delete learnerFiles[name];
+    deleteLearnerPdf(name);
+    renderLearnerList();
+    saveLearnersToStorage();
+    if(hasStorage){
+      storageDelete(markingKey(name), true).catch(()=>{});
+    }
+    if(lastLoadedMarkingName === name) lastLoadedMarkingName = "";
+  }
+});
+
+function startRenameLearner(span){
+  const oldName = span.textContent;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = oldName;
+  input.className = 'rename-input';
+  span.replaceWith(input);
+  input.focus();
+  input.select();
+  let committed = false;
+  const commit = ()=>{
+    if(committed) return;
+    committed = true;
+    const newName = input.value.trim();
+    if(newName && newName !== oldName){
+      renameLearner(oldName, newName);
+    } else {
+      renderLearnerList();
+    }
+  };
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', (ev)=>{
+    if(ev.key === 'Enter'){ ev.preventDefault(); input.blur(); }
+    if(ev.key === 'Escape'){ input.value = oldName; committed = true; renderLearnerList(); }
+  });
+}
+
+async function renameLearner(oldName, newName){
+  if(learners.some(n=>n!==oldName && normalizeName(n)===normalizeName(newName))){
+    alert(`"${newName}" is already in the list.`);
+    renderLearnerList();
+    return;
+  }
+  const idx = learners.indexOf(oldName);
+  if(idx > -1) learners[idx] = newName;
+  if(learnerFiles[oldName]){
+    learnerFiles[newName] = learnerFiles[oldName];
+    delete learnerFiles[oldName];
+    await renameLearnerPdf(oldName, newName);
+  }
+  if(document.getElementById('learnerName').value === oldName){
+    document.getElementById('learnerName').value = newName;
+  }
+  if(lastLoadedMarkingName === oldName) lastLoadedMarkingName = newName;
+  renderLearnerList();
+  saveLearnersToStorage();
+  if(hasStorage){
+    try{
+      const result = await storageGet(markingKey(oldName), true);
+      if(result && result.value){
+        await storageSet(markingKey(newName), result.value, true);
+        await storageDelete(markingKey(oldName), true);
+      }
+    }catch(e){ /* nothing saved under the old name */ }
+  }
+}
+
+document.getElementById('learnerPicker').addEventListener('change', async (e)=>{
+  const name = e.target.value;
+  if(!name) return;
+  await switchMarkingLearner(name);
+  if(learnerFiles[name]){
+    await renderPdfFromArrayBuffer(learnerFiles[name].buffer, learnerFiles[name].fileName);
+  } else {
+    fileNameEl.textContent = "No file attached";
+    uploadStatus.textContent = `No PDF attached for ${name} yet. Attach one on the "Learners & Assignments" tab, or use the button above to upload one now.`;
+    uploadStatus.className = "status err";
+    pdfPages.innerHTML = `<div class="pdf-placeholder">No PDF attached for this learner yet.</div>`;
+  }
+});
+
+// ---------- Startup password ----------
+const SYSTEM_PASSWORD = 'IARS2030';
+const authForm = document.getElementById('authForm');
+const authGate = document.getElementById('authGate');
+const systemPasswordInput = document.getElementById('systemPassword');
+const authError = document.getElementById('authError');
+
+authForm.addEventListener('submit', (e)=>{
+  e.preventDefault();
+  if(systemPasswordInput.value === SYSTEM_PASSWORD){
+    authGate.style.display = 'none';
+    authError.textContent = '';
+    systemPasswordInput.value = '';
+  }else{
+    authError.textContent = 'Incorrect password. Please try again.';
+    systemPasswordInput.value = '';
+    systemPasswordInput.focus();
+  }
+});
+
+// ---------- Init ----------
+(async function init(){
+  await loadCriteriaFromStorage();
+  await loadLearnersFromStorage();
+  await loadAllLearnerPdfs();
+  renderMarkingTable();
+  renderAdminForm();
+  renderLearnerList();
+  if(!hasStorage){
+    document.getElementById('storageNote').textContent = "Storage isn't available in this environment — admin changes will apply for this session only.";
+  } else if(jsonbinConfigured){
+    document.getElementById('storageNote').textContent = "Synced via jsonbin.io — visible on any machine opening this same file with the jsonbin details filled in.";
+  } else if(!hasCloudStorage){
+    document.getElementById('storageNote').textContent = "Saved to this browser on this computer only. To sync across machines, fill in the JSONBIN_BIN_ID and JSONBIN_API_KEY constants near the top of the script.";
+  }
+})();
+</script>
+
+</body>
+</html>
